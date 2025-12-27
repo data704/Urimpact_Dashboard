@@ -1,0 +1,145 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ndvi-calculatorr/server/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REPOSITORY: ndvi-backend
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get short commit SHA
+        id: commit
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        working-directory: ./ndvi-calculatorr/server
+        run: |
+          docker build -t $ECR_REPOSITORY:${{ steps.commit.outputs.sha }} .
+          docker tag $ECR_REPOSITORY:${{ steps.commit.outputs.sha }} $ECR_REPOSITORY:latest
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push $ECR_REPOSITORY:${{ steps.commit.outputs.sha }}
+          docker push $ECR_REPOSITORY:latest
+        env:
+          ECR_REPOSITORY: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+
+  deploy:
+    name: Deploy to EC2
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get short commit SHA
+        id: commit
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Get ECR login token
+        id: ecr-login
+        run: |
+          ECR_TOKEN=$(aws ecr get-login-password --region ${{ env.AWS_REGION }})
+          echo "token=$ECR_TOKEN" >> $GITHUB_OUTPUT
+          echo "registry=${{ secrets.ECR_REGISTRY }}" >> $GITHUB_OUTPUT
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME || 'ec2-user' }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Login to ECR
+            echo "${{ steps.ecr-login.outputs.token }}" | docker login -u AWS --password-stdin ${{ steps.ecr-login.outputs.registry }}
+            
+            # Pull latest image
+            docker pull ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+            
+            # Stop and remove old container
+            docker stop ndvi-backend || true
+            docker rm ndvi-backend || true
+            
+            # Fetch secrets from AWS Secrets Manager
+            export DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id ndvi/rds/password --region ${{ env.AWS_REGION }} --query SecretString --output text)
+            export JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id ndvi/jwt/secret --region ${{ env.AWS_REGION }} --query SecretString --output text)
+            export GEE_CREDENTIALS=$(aws secretsmanager get-secret-value --secret-id ndvi/gee/credentials --region ${{ env.AWS_REGION }} --query SecretString --output text)
+            
+            # Parse GEE credentials
+            export GEE_PRIVATE_KEY=$(echo $GEE_CREDENTIALS | jq -r '.private_key')
+            export GEE_CLIENT_EMAIL=$(echo $GEE_CREDENTIALS | jq -r '.client_email')
+            export GEE_PROJECT_ID=$(echo $GEE_CREDENTIALS | jq -r '.project_id')
+            
+            # Run new container
+            docker run -d \
+              --name ndvi-backend \
+              --restart always \
+              -p 3000:3000 \
+              -e NODE_ENV=production \
+              -e AWS_REGION=${{ env.AWS_REGION }} \
+              -e USE_AWS_SECRETS=true \
+              -e DB_HOST=${{ secrets.RDS_ENDPOINT }} \
+              -e DB_PORT=5432 \
+              -e DB_NAME=ndvi_majmaah_db \
+              -e DB_USER=postgres \
+              -e DB_PASSWORD="$DB_PASSWORD" \
+              -e JWT_SECRET="$JWT_SECRET" \
+              -e GEE_PRIVATE_KEY="$GEE_PRIVATE_KEY" \
+              -e GEE_CLIENT_EMAIL="$GEE_CLIENT_EMAIL" \
+              -e GEE_PROJECT_ID="$GEE_PROJECT_ID" \
+              -e CORS_ORIGINS="${{ secrets.CORS_ORIGINS }}" \
+              -e PORT=3000 \
+              ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+            
+            # Wait for health check
+            echo "Waiting for health check..."
+            sleep 10
+            
+            # Health check
+            for i in {1..30}; do
+              if curl -f http://localhost:3000/api/health > /dev/null 2>&1; then
+                echo "✅ Health check passed!"
+                exit 0
+              fi
+              echo "Health check attempt $i/30..."
+              sleep 2
+            done
+            
+            echo "❌ Health check failed!"
+            docker logs ndvi-backend --tail 50
+            exit 1
+

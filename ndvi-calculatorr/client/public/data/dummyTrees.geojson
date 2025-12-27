@@ -1,0 +1,356 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7485, 24.5465]
+      },
+      "properties": {
+        "id": 1,
+        "healthScore": 5,
+        "ndvi": 0.75,
+        "species": "Acacia",
+        "canopyDiameter": 8.5
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7488, 24.5472]
+      },
+      "properties": {
+        "id": 2,
+        "healthScore": 4,
+        "ndvi": 0.65,
+        "species": "Date Palm",
+        "canopyDiameter": 6.2
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7492, 24.5468]
+      },
+      "properties": {
+        "id": 3,
+        "healthScore": 3,
+        "ndvi": 0.55,
+        "species": "Acacia",
+        "canopyDiameter": 5.8
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7495, 24.5475]
+      },
+      "properties": {
+        "id": 4,
+        "healthScore": 5,
+        "ndvi": 0.78,
+        "species": "Date Palm",
+        "canopyDiameter": 9.1
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7501, 24.5462]
+      },
+      "properties": {
+        "id": 5,
+        "healthScore": 4,
+        "ndvi": 0.68,
+        "species": "Acacia",
+        "canopyDiameter": 7.3
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7504, 24.5469]
+      },
+      "properties": {
+        "id": 6,
+        "healthScore": 2,
+        "ndvi": 0.42,
+        "species": "Acacia",
+        "canopyDiameter": 4.5
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7507, 24.5476]
+      },
+      "properties": {
+        "id": 7,
+        "healthScore": 5,
+        "ndvi": 0.82,
+        "species": "Date Palm",
+        "canopyDiameter": 10.2
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7511, 24.5458]
+      },
+      "properties": {
+        "id": 8,
+        "healthScore": 3,
+        "ndvi": 0.58,
+        "species": "Acacia",
+        "canopyDiameter": 6.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7514, 24.5465]
+      },
+      "properties": {
+        "id": 9,
+        "healthScore": 4,
+        "ndvi": 0.66,
+        "species": "Date Palm",
+        "canopyDiameter": 7.8
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7517, 24.5472]
+      },
+      "properties": {
+        "id": 10,
+        "healthScore": 5,
+        "ndvi": 0.79,
+        "species": "Acacia",
+        "canopyDiameter": 8.9
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7482, 24.5455]
+      },
+      "properties": {
+        "id": 11,
+        "healthScore": 3,
+        "ndvi": 0.52,
+        "species": "Acacia",
+        "canopyDiameter": 5.5
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7486, 24.5462]
+      },
+      "properties": {
+        "id": 12,
+        "healthScore": 4,
+        "ndvi": 0.64,
+        "species": "Date Palm",
+        "canopyDiameter": 7.1
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7499, 24.5452]
+      },
+      "properties": {
+        "id": 13,
+        "healthScore": 2,
+        "ndvi": 0.45,
+        "species": "Acacia",
+        "canopyDiameter": 4.2
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7503, 24.5459]
+      },
+      "properties": {
+        "id": 14,
+        "healthScore": 5,
+        "ndvi": 0.81,
+        "species": "Date Palm",
+        "canopyDiameter": 9.5
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7506, 24.5466]
+      },
+      "properties": {
+        "id": 15,
+        "healthScore": 4,
+        "ndvi": 0.67,
+        "species": "Acacia",
+        "canopyDiameter": 7.4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7510, 24.5448]
+      },
+      "properties": {
+        "id": 16,
+        "healthScore": 3,
+        "ndvi": 0.56,
+        "species": "Acacia",
+        "canopyDiameter": 6.1
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7513, 24.5455]
+      },
+      "properties": {
+        "id": 17,
+        "healthScore": 4,
+        "ndvi": 0.69,
+        "species": "Date Palm",
+        "canopyDiameter": 8.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7478, 24.5478]
+      },
+      "properties": {
+        "id": 18,
+        "healthScore": 5,
+        "ndvi": 0.76,
+        "species": "Acacia",
+        "canopyDiameter": 8.7
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7481, 24.5485]
+      },
+      "properties": {
+        "id": 19,
+        "healthScore": 3,
+        "ndvi": 0.54,
+        "species": "Acacia",
+        "canopyDiameter": 5.7
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7494, 24.5479]
+      },
+      "properties": {
+        "id": 20,
+        "healthScore": 4,
+        "ndvi": 0.63,
+        "species": "Date Palm",
+        "canopyDiameter": 6.9
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7497, 24.5445]
+      },
+      "properties": {
+        "id": 21,
+        "healthScore": 2,
+        "ndvi": 0.43,
+        "species": "Acacia",
+        "canopyDiameter": 4.3
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7500, 24.5452]
+      },
+      "properties": {
+        "id": 22,
+        "healthScore": 5,
+        "ndvi": 0.80,
+        "species": "Date Palm",
+        "canopyDiameter": 9.8
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7508, 24.5442]
+      },
+      "properties": {
+        "id": 23,
+        "healthScore": 4,
+        "ndvi": 0.71,
+        "species": "Acacia",
+        "canopyDiameter": 7.9
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7512, 24.5449]
+      },
+      "properties": {
+        "id": 24,
+        "healthScore": 3,
+        "ndvi": 0.57,
+        "species": "Acacia",
+        "canopyDiameter": 6.2
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [46.7475, 24.5468]
+      },
+      "properties": {
+        "id": 25,
+        "healthScore": 4,
+        "ndvi": 0.70,
+        "species": "Date Palm",
+        "canopyDiameter": 8.2
+      }
+    }
+  ]
+}
+

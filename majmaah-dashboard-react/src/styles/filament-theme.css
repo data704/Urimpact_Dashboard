@@ -1,0 +1,357 @@
+/* Filament Theme - Exact replica of Laravel Filament styling */
+
+/* ============================================
+   Scrollbar (Exact Filament style)
+   ============================================ */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    height: 5px;
+    width: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #e5e7eb;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #c9cbcd;
+  }
+
+  .dark ::-webkit-scrollbar-track {
+    background: #101215;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: #1f2126;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #1a1d21;
+  }
+
+  @supports (-moz-appearance: none) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #d1d5db #e5e7eb;
+    }
+
+    .dark, .dark * {
+      scrollbar-color: #1f2126 #101215;
+    }
+  }
+}
+
+/* ============================================
+   Sidebar Styles (Exact Filament)
+   ============================================ */
+.sidebar {
+  background: #ffffff;
+  width: 18rem;
+  height: 100vh;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin: 0.125rem 0.5rem;
+  border-radius: 0.375rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.sidebar-item:hover {
+  background: #f9fafb;
+  color: #374151;
+}
+
+.sidebar-item.active {
+  background: #13c5bc !important;
+  color: #f3f4f6 !important;
+}
+
+.sidebar-item.active svg {
+  color: #f3f4f6 !important;
+}
+
+.sidebar-group-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.5rem 1rem;
+  margin-top: 1rem;
+}
+
+/* ============================================
+   Topbar Styles (Exact Filament)
+   ============================================ */
+.topbar {
+  height: 4rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+}
+
+.topbar-logo {
+  height: 2.8rem;
+}
+
+/* ============================================
+   Main Content Area (Exact Filament)
+   ============================================ */
+.main-content {
+  background: #f5f5f4;
+  border-top-right-radius: 25px;
+  min-height: calc(100vh - 4rem);
+  padding: 1.5rem;
+}
+
+/* ============================================
+   Widget Cards (Exact Filament)
+   ============================================ */
+.widget-card {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* ============================================
+   Stat Cards (Exact Filament)
+   ============================================ */
+.stat-card {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: #13c5bc;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.stat-description {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* ============================================
+   Login Page (Exact Filament)
+   ============================================ */
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+}
+
+.login-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.login-card {
+  position: relative;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 0.75rem;
+  padding: 2rem;
+  width: 100%;
+  max-width: 28rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.login-logo {
+  height: 3rem;
+  margin: 0 auto 2rem;
+  display: block;
+}
+
+/* ============================================
+   Form Elements (Exact Filament)
+   ============================================ */
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.form-input {
+  display: block;
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #111827;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  transition: all 0.15s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #13c5bc;
+  ring: 2px;
+  ring-color: rgba(19, 197, 188, 0.1);
+}
+
+.form-checkbox {
+  width: 1rem;
+  height: 1rem;
+  color: #13c5bc;
+  border-radius: 0.25rem;
+  border: 1px solid #d1d5db;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: #13c5bc;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+}
+
+.btn-primary:hover {
+  background: #109c95;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   User Menu (Exact Filament)
+   ============================================ */
+.user-menu {
+  position: relative;
+}
+
+.user-menu-button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.user-menu-button:hover {
+  background: #f9fafb;
+}
+
+.user-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  object-fit: cover;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 0.5rem;
+  width: 12rem;
+  background: #ffffff;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  z-index: 50;
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.user-menu-item:hover {
+  background: #f9fafb;
+}
+
+.user-menu-item:first-child {
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+
+.user-menu-item:last-child {
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+}
+
+/* ============================================
+   Responsive (Mobile)
+   ============================================ */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: -18rem;
+    transition: left 0.3s ease;
+    z-index: 40;
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+
+  .main-content {
+    border-top-right-radius: 0;
+  }
+}
+
