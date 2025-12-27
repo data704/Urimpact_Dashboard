@@ -85,10 +85,10 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             # Login to ECR
-            echo "${{ steps.ecr-login.outputs.token }}" | docker login -u AWS --password-stdin ${{ steps.ecr-login.outputs.registry }}
+            echo "${{ steps.ecr-login.outputs.token }}" | docker login -u AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
             
             # Pull latest image
-            docker pull ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+            docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
             
             # Stop and remove old container
             docker stop ndvi-backend || true
@@ -123,7 +123,7 @@ jobs:
               -e GEE_PROJECT_ID="$GEE_PROJECT_ID" \
               -e CORS_ORIGINS="${{ secrets.CORS_ORIGINS }}" \
               -e PORT=3000 \
-              ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+              ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
             
             # Wait for health check
             echo "Waiting for health check..."
@@ -142,6 +142,7 @@ jobs:
             echo "❌ Health check failed!"
             docker logs ndvi-backend --tail 50
             exit 1
+
 
 
 
