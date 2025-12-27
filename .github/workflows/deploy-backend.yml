@@ -40,7 +40,7 @@ jobs:
       - name: Build Docker image
         working-directory: ./ndvi-calculatorr/server
         run: |
-          docker build -t $ECR_REPOSITORY:${{ steps.commit.outputs.sha }} .
+          docker build -t ${{ env.ECR_REPOSITORY }}:${{ steps.commit.outputs.sha }} .
           docker tag $ECR_REPOSITORY:${{ steps.commit.outputs.sha }} $ECR_REPOSITORY:latest
 
       - name: Push Docker image to ECR
