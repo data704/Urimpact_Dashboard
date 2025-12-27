@@ -112,7 +112,7 @@ jobs:
               -e NODE_ENV=production \
               -e AWS_REGION=${{ env.AWS_REGION }} \
               -e USE_AWS_SECRETS=true \
-              -e DB_HOST=${{ secrets.RDS_ENDPOINT }} \
+              -e DB_HOST=${{ secrets.RDS_HOST }} \
               -e DB_PORT=5432 \
               -e DB_NAME=ndvi_majmaah_db \
               -e DB_USER=postgres \
