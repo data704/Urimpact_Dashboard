@@ -4,25 +4,27 @@ const { Pool } = pkg;
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-// Create connection pool with production-ready settings
 export const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432', 10),
   database: process.env.DB_NAME || 'ndvi_majmaah_db',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD,
-  // Connection pool settings
-  max: parseInt(process.env.DB_POOL_MAX || '20', 10), // Maximum number of clients in the pool
-  min: parseInt(process.env.DB_POOL_MIN || '2', 10), // Minimum number of clients
-  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10), // Close idle clients after 30s
-  connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '5000', 10), // 5s timeout for new connections
-  // RDS-specific settings
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false, // Enable SSL for RDS
-  // Keep-alive settings for RDS
+
+  max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+  min: parseInt(process.env.DB_POOL_MIN || '2', 10),
+  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
+  connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '5000', 10),
+
+  // ✅ FIX: Always use SSL in production (RDS requirement)
+  ssl: process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: false }
+    : false,
+
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 });
+
 
 // Test connection on startup
 pool.on('connect', () => {
