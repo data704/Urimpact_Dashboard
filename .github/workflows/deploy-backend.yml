@@ -41,7 +41,7 @@ jobs:
         working-directory: ./ndvi-calculatorr/server
         run: |
           docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.commit.outputs.sha }} .
-          docker tag ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.commit.outputs.sha }} $ECR_REPOSITORY:latest
+          docker tag ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.commit.outputs.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Push Docker image to ECR
         run: |
@@ -142,5 +142,6 @@ jobs:
             echo "❌ Health check failed!"
             docker logs ndvi-backend --tail 50
             exit 1
+
 
 
