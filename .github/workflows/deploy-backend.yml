@@ -96,15 +96,44 @@ jobs:
               --output text)
 
             echo "🔑 Fetch GEE credentials"
-            export GEE_CREDENTIALS=$(aws secretsmanager get-secret-value \
-              --secret-id ndvi/gee/credentials \
-              --region eu-central-1 \
-              --query SecretString \
-              --output text)
-
-            export GEE_PRIVATE_KEY=$(echo "$GEE_CREDENTIALS" | jq -r '.private_key')
-            export GEE_CLIENT_EMAIL=$(echo "$GEE_CREDENTIALS" | jq -r '.client_email')
-            export GEE_PROJECT_ID=$(echo "$GEE_CREDENTIALS" | jq -r '.project_id')
+            export GEE_PROJECT_ID="generated-motif-436602-f7"
+            export GEE_CLIENT_EMAIL="climafund-c1e611ae590cbb41273c@generated-motif-436602-f7.iam.gserviceaccount.com"
+            
+            # CRITICAL FIX: Store private key preserving newlines
+            cat > /tmp/gee_key.pem << 'EOF'
+            -----BEGIN PRIVATE KEY-----
+            MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC0FuF9WkvYStHl
+            B3eJN2fq/5DcyZJGLShy6fdA0Uy2BXHgSDv5IWBuaZC9b8uE7keEi2OEmwCB3AnC
+            IRIJebxoht1LFvRTtEL/+88iu/Bn95QmDHJJDxwPanQWrW5F3VDkzv1CDbvjaIj0
+            rC/08SnfXHTDgQqIFW0xGyO3RwxAqp1T9P9Je3HKzf+VAdrsk5erU5u/mr/J6JjU
+            WWZo8SsawBcvgEsGuero0YasjaFeu4nQp0MNT9DZjH7H8RhwzzDAXdx3gKgiBQ2A
+            Zf+8wVNA145q0myCqhiMJSkPDzxQpkQ4Rys5/xXht1Nr6/FwW++fnUwoTRLlYVQy
+            HIHj9OBPAgMBAAECggEAFAtp7Lhksb3eL+ZNXUX/+I2ak6CR+eKj2mqFPT8ukSH5
+            A1Q27KtU3uU8GYG8ft7AshWLraJNA6c4pNVmewyENoQwVF/JMRnizTg7XWvavc+2
+            OyfufohCgMrCAhYqrHcOPnF1iekabRzhBY62xcYj+XsCehI+WFg+L5WMO6WaTQYg
+            hwTcsO5jJ1sL/XepNfI93hSGnccyClBNAOv4foh/bSJ07gW9SWe5+JEBeERzB1YL
+            sCoiGMDlgcxIKQKN3o6eb88gPlunXItLmV6ZYQa4nfK3xKurUQHnG2b2H5+Fr31c
+            2EPeAbPNmgZauAt12dSZUYk6A2su27hyucOiTffZpQKBgQDpXxILortSJK2SGOkt
+            qfydtbQ1lgwY8G6BgTlkw2GcgC7bb/bPmqOev3llLnZVAXWgLhNbQvj3akk6wk1d
+            zqY1chbtAdVvqmqgj60mdEqM5NBpS3Zv+BrDDKaK44vG0UbOSMf3b9BNVbod2tpG
+            VYogLXzb97K7vhGAGEet4vJ51QKBgQDFjTPSFx8oYQkGVxndIDdHcBKXX0/NmBDH
+            EoQinkdiv33FX6tWf00VxYj7UTUZ3snQ671Kbb3TiCcIhp+cD9UI6Fd2l99YrWpy
+            HG0EdoXF3LoRphLL5LqIJZi1xLKiHs63qfLmmJUuAyfOUiexsUF6KQ62rEVCttJi
+            MV4QgQe/kwKBgBbZsTmkcHUFlF02xTYsa8jBbujETWDvwdI6ZfVA0EDzqCLiXqdL
+            O/QiSW+n0fxWzT6m5ExOTXRkWtE/DzY9MrcO+cGxKUXqyM/54Xlfb6FGEkYNFoa2
+            I2Cvz2rQBvKrsSQnqjTHJP09hKDBuhei7ohiC9S59y082hfRyMr06ssVAoGBAKOb
+            YYNo6sECO/soP59GgwGC66K5qNnYSmzUBOK2uuApPvwrUzb7jtetFNkuVA/s1q9T
+            zRzK7h817z28YItbAU+zPFxXQv2qATIoIJFFp1xKhT8AjyiVcXY3zNUc5eQmJ4Us
+            FqKrU0EcE+dnWsBq0JNfVXQsD+BEkNAJmqGIeuZJAoGAUOfavlpsMf/JKRg7/cHF
+            eiqoSUFu5PkMMMJOHVoet4E5LNqtkBQzF0vuVLPLF77lWCsdlMtPvG+dKB9z9AJm
+            6IKh41h1Y6UPvXSyA/rNfGnfVO3OEXwWqoSF84W4CWgIFltIOJki1+lB+xOAINaH
+            1xcM65zVf2UtG307unI7PhQ=
+            -----END PRIVATE KEY-----
+            EOF
+            
+            # Convert to single line with \n for Docker env var
+            export GEE_PRIVATE_KEY=$(awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' /tmp/gee_key.pem)
+            rm /tmp/gee_key.pem
 
             echo "🚀 Start new container"
             docker run -d \
@@ -119,9 +148,9 @@ jobs:
               -e DB_USER=postgres \
               -e DB_PASSWORD="$DB_PASSWORD" \
               -e JWT_SECRET="$JWT_SECRET" \
-              -e GEE_PRIVATE_KEY="$GEE_PRIVATE_KEY" \
-              -e GEE_CLIENT_EMAIL="$GEE_CLIENT_EMAIL" \
               -e GEE_PROJECT_ID="$GEE_PROJECT_ID" \
+              -e GEE_CLIENT_EMAIL="$GEE_CLIENT_EMAIL" \
+              -e GEE_PRIVATE_KEY="$GEE_PRIVATE_KEY" \
               -e PORT=3000 \
               725948481931.dkr.ecr.eu-central-1.amazonaws.com/ndvi-backend:latest
 
