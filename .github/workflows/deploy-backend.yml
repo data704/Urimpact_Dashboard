@@ -83,7 +83,7 @@ jobs:
 
             echo "🔑 Fetch DB password from AWS-managed RDS secret"
             export DB_PASSWORD=$(aws secretsmanager get-secret-value \
-              --secret-id arn:aws:secretsmanager:eu-central-1:725948481931:secret:rds!db-4d21cf3e-dfd4-4974-a12e-0f387bc4d618-OknCOA \
+              --secret-id 'arn:aws:secretsmanager:eu-central-1:725948481931:secret:rds!db-4d21cf3e-dfd4-4974-a12e-0f387bc4d618-OknCOA' \
               --region eu-central-1 \
               --query SecretString \
               --output text | jq -r '.password')
@@ -113,7 +113,7 @@ jobs:
               -p 3000:3000 \
               -e NODE_ENV=production \
               -e AWS_REGION=eu-central-1 \
-              -e DB_HOST=${{ secrets.RDS_HOST }} \
+              -e DB_HOST=ndvi-majmaah-db.c9quck2ekoks.eu-central-1.rds.amazonaws.com \
               -e DB_PORT=5432 \
               -e DB_NAME=ndvi_majmaah_db \
               -e DB_USER=postgres \
