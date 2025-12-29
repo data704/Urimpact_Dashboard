@@ -234,7 +234,7 @@ export const DynamicReportModal: React.FC<DynamicReportModalProps> = ({
         filename: `URIMPACT_Advanced_Tier_Report_Majmaah_University_Tree_Planting_Project_${new Date().toISOString().split('T')[0]}.pdf`,
         image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
       };
 
       await html2pdf().set(opt).from(reportRef.current).save();
