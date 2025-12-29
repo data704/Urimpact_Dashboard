@@ -34,7 +34,7 @@ export const ProjectImpactWidget: React.FC = () => {
       if (Array.isArray(coord[0])) {
         // Polygon coordinates
         coord.forEach(point => {
-          const pointCoords = point as [number, number];
+          const pointCoords = point as unknown as [number, number];
           bounds.extend(pointCoords);
         });
       } else {
@@ -59,7 +59,7 @@ export const ProjectImpactWidget: React.FC = () => {
       if (Array.isArray(coord[0])) {
         // Polygon coordinates
         coord.forEach(point => {
-          const pointCoords = point as [number, number];
+          const pointCoords = point as unknown as [number, number];
           sumLng += pointCoords[0];
           sumLat += pointCoords[1];
           count++;
@@ -210,7 +210,7 @@ export const ProjectImpactWidget: React.FC = () => {
               coords = typeof analysisResponse.data.coordinates === 'string'
                 ? JSON.parse(analysisResponse.data.coordinates)
                 : analysisResponse.data.coordinates;
-              setAnalysisCoordinates(coords);
+              // Coordinates stored in coords variable for use in zoom calculations
             } catch (e) {
               console.warn('Failed to parse analysis coordinates:', e);
             }
