@@ -13,8 +13,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/context/LanguageContext';
 import type { NavigationItem } from '@/types';
-import { useAuth } from '@/context/AuthContext';
-import { UserRole } from '@/types';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -23,7 +21,6 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
-  const { user } = useAuth();
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
 

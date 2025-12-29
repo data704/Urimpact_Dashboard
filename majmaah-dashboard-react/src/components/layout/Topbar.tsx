@@ -12,7 +12,7 @@ interface TopbarProps {
 
 export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, isSidebarOpen }) => {
   const { user, logout } = useAuth();
-  const { language, toggleLanguage, isRTL } = useLanguage();
+  const { language, toggleLanguage } = useLanguage();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);

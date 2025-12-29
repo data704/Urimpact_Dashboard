@@ -3,7 +3,7 @@ import { X, Download, Loader2, FileText } from 'lucide-react';
 import apiService from '@/services/api';
 import { config } from '@/config';
 import html2pdf from 'html2pdf.js';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface DashboardData {
   stats: {
@@ -230,7 +230,7 @@ export const DynamicReportModal: React.FC<DynamicReportModalProps> = ({
       setLoading(true);
       
       const opt = {
-        margin: [10, 10, 10, 10],
+        margin: [10, 10, 10, 10] as [number, number, number, number],
         filename: `URIMPACT_Advanced_Tier_Report_Majmaah_University_Tree_Planting_Project_${new Date().toISOString().split('T')[0]}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
@@ -716,7 +716,7 @@ export const DynamicReportModal: React.FC<DynamicReportModalProps> = ({
                             fill="#8884d8"
                             dataKey="value"
                           >
-                            {data.canopyCoverage.map((entry, index) => (
+                            {data.canopyCoverage.map((_entry, index) => (
                               <Cell key={`cell-${index}`} fill={['#10b981', '#22c55e', '#3b82f6', '#f59e0b'][index % 4]} />
                             ))}
                           </Pie>

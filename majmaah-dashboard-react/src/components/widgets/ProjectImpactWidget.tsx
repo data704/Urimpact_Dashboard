@@ -21,11 +21,9 @@ export const ProjectImpactWidget: React.FC = () => {
   const { t } = useTranslation();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
   const [trees, setTrees] = useState<MajmaahTree[]>(mockMajmaahTrees);
   const [dataLoading, setDataLoading] = useState(true);
   const [useRealData, setUseRealData] = useState(false);
-  const [analysisCoordinates, setAnalysisCoordinates] = useState<number[][] | null>(null);
 
   // Helper function to calculate bounds from coordinates
   const calculateBounds = (coords: number[][]): mapboxgl.LngLatBounds | null => {
@@ -35,10 +33,14 @@ export const ProjectImpactWidget: React.FC = () => {
     coords.forEach(coord => {
       if (Array.isArray(coord[0])) {
         // Polygon coordinates
-        coord.forEach(point => bounds.extend([point[0], point[1]]));
+        coord.forEach(point => {
+          const pointCoords = point as [number, number];
+          bounds.extend(pointCoords);
+        });
       } else {
         // Single point
-        bounds.extend([coord[0], coord[1]]);
+        const pointCoords = coord as [number, number];
+        bounds.extend(pointCoords);
       }
     });
     
@@ -57,14 +59,16 @@ export const ProjectImpactWidget: React.FC = () => {
       if (Array.isArray(coord[0])) {
         // Polygon coordinates
         coord.forEach(point => {
-          sumLng += point[0];
-          sumLat += point[1];
+          const pointCoords = point as [number, number];
+          sumLng += pointCoords[0];
+          sumLat += pointCoords[1];
           count++;
         });
       } else {
         // Single point
-        sumLng += coord[0];
-        sumLat += coord[1];
+        const pointCoords = coord as [number, number];
+        sumLng += pointCoords[0];
+        sumLat += pointCoords[1];
         count++;
       }
     });
@@ -88,7 +92,6 @@ export const ProjectImpactWidget: React.FC = () => {
     map.current.addControl(new mapboxgl.FullscreenControl(), 'top-right');
 
     map.current.on('load', () => {
-      setMapLoaded(true);
 
       const addTreeLayers = (treeData: MajmaahTree[]) => {
         if (!map.current) return;
