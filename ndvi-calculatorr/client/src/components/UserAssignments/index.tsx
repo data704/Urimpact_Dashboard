@@ -2,7 +2,7 @@
 // Interface for admins to assign analyses to specific users
 
 import React, { useState, useEffect } from 'react';
-import { User, Search, CheckCircle, XCircle, Plus, Trash2, Filter } from 'lucide-react';
+import { User, Search, CheckCircle, XCircle, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import './styles.css';
 

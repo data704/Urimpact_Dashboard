@@ -2,7 +2,7 @@
 // Interface for admins to assign analyses to Majmaah dashboard
 
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Eye, EyeOff, Edit2, Trash2, Save, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, EyeOff, Edit2, Trash2, Save } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import './styles.css';
 

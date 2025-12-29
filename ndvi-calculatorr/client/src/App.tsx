@@ -27,9 +27,8 @@ function App() {
     return <LoginPage />;
   }
 
-  // Protected admin tabs
-  const adminTabs = ['admin', 'users', 'user-assignments'];
-  const isAdminTab = adminTabs.includes(activeTab);
+  // Protected admin tabs (for future use if needed)
+  // const adminTabs = ['admin', 'users', 'user-assignments'];
 
   return (
     <div className="app">
