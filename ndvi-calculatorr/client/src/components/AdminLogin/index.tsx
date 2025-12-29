@@ -18,7 +18,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ isOpen, onClose, onLoginSuccess
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE = 'http://localhost:3000/api';
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

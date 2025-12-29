@@ -151,6 +151,7 @@ jobs:
               -e GEE_PROJECT_ID="$GEE_PROJECT_ID" \
               -e GEE_CLIENT_EMAIL="$GEE_CLIENT_EMAIL" \
               -e GEE_PRIVATE_KEY="$GEE_PRIVATE_KEY" \
+              -e CORS_ORIGINS="${{ secrets.CORS_ORIGINS }}" \
               -e PORT=3000 \
               725948481931.dkr.ecr.eu-central-1.amazonaws.com/ndvi-backend:latest
 

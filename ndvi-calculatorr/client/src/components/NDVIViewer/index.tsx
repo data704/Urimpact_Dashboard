@@ -51,7 +51,8 @@ const NDVIViewer: React.FC = () => {
       setError(null);
   
       const coordinates = e.features[0].geometry.coordinates[0];
-      const response = await fetch('http://localhost:3000/api/calculate-ndvi', {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE}/calculate-ndvi`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ coordinates })

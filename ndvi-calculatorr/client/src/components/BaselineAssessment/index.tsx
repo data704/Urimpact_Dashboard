@@ -308,7 +308,8 @@ const BaselineAssessment: React.FC = () => {
       }
 
       // Check if area is too large (optional warning)
-      const response = await fetch('http://localhost:3000/api/baseline-assessment', {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE}/baseline-assessment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ coordinates, vegetationMode })

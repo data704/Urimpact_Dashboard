@@ -41,7 +41,7 @@ const UserAssignments: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const { token } = useAuth();
 
-  const API_BASE = 'http://localhost:3000/api';
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
   useEffect(() => {
     if (token) {
