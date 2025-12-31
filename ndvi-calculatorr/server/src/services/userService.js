@@ -14,24 +14,26 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
  */
 export const createUser = async (userData) => {
   const { name, email, password, role = 'client' } = userData;
-  
+
   const client = await pool.connect();
   try {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
     
+    // Auto-generate username from email (part before @)
+    const username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+
     const result = await client.query(`
-      INSERT INTO users (name, email, password_hash, role, is_active)
-      VALUES ($1, $2, $3, $4, true)
-      RETURNING id, name, email, role, is_active, created_at
-    `, [name, email, passwordHash, role]);
-    
+      INSERT INTO users (username, name, email, password_hash, role, is_active)
+      VALUES ($1, $2, $3, $4, $5, true)
+      RETURNING id, username, name, email, role, is_active, created_at
+    `, [username, name, email, passwordHash, role]);
+
     return result.rows[0];
   } finally {
     client.release();
   }
 };
-
 /**
  * Get all users
  */
