@@ -29,7 +29,7 @@ const NDVIViewer: React.FC = () => {
   map.current = new mapboxgl.Map({
     container: mapContainer.current,
     style: 'mapbox://styles/mapbox/satellite-v9',
-    center: [57.5, 23.5], // Wadi Al Batha, Oman
+    center: [45.416466418084234, 25.870682243900877], // Majmaah University
     zoom: 13
   });
 

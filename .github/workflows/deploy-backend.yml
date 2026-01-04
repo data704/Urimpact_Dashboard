@@ -147,6 +147,7 @@ jobs:
               -e DB_NAME=ndvi_majmaah_db \
               -e DB_USER=postgres \
               -e DB_PASSWORD="$DB_PASSWORD" \
+              -e DB_SSL=true \
               -e JWT_SECRET="$JWT_SECRET" \
               -e GEE_PROJECT_ID="$GEE_PROJECT_ID" \
               -e GEE_CLIENT_EMAIL="$GEE_CLIENT_EMAIL" \

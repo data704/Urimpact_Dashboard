@@ -28,7 +28,29 @@ export const saveBaselineAssessment = async (data) => {
     const totalCarbonTonnes = ((agbEstimation.totalAGBTonnes || 0) * 0.47) || 0;
     const co2EquivalentTonnes = totalCarbonTonnes * 3.67; // Convert carbon to CO2
 
+    // Clamp NDVI/EVI values to valid range (-1 to 1) to prevent database overflow
+    // NUMERIC(5,3) can store -99.999 to 99.999, but NDVI/EVI should be -1 to 1
+    const clampNDVI = (value, name = 'value') => {
+      if (value === null || value === undefined) return 0;
+      const num = parseFloat(value);
+      if (isNaN(num)) return 0;
+      // Clamp to -1 to 1 range
+      const clamped = Math.max(-1, Math.min(1, num));
+      if (clamped !== num) {
+        console.warn(`⚠️  Clamped ${name} from ${num} to ${clamped} (NDVI/EVI should be -1 to 1)`);
+      }
+      return clamped;
+    };
+
+    const ndviMean = clampNDVI(baselineImagery.ndviStats?.mean, 'NDVI mean');
+    const ndviMin = clampNDVI(baselineImagery.ndviStats?.min, 'NDVI min');
+    const ndviMax = clampNDVI(baselineImagery.ndviStats?.max, 'NDVI max');
+    const eviMean = clampNDVI(baselineImagery.eviStats?.mean, 'EVI mean');
+    const eviMin = clampNDVI(baselineImagery.eviStats?.min, 'EVI min');
+    const eviMax = clampNDVI(baselineImagery.eviStats?.max, 'EVI max');
+
     // Insert analysis result with ALL metrics
+    // NOTE: assigned_to_majmaah defaults to false, so this analysis will appear in unassigned list
     const result = await client.query(`
       INSERT INTO analysis_results (
         project_id, analysis_type, analysis_date, coordinates,
@@ -43,7 +65,9 @@ export const saveBaselineAssessment = async (data) => {
         ndvi_map_id, ndvi_url_format,
         evi_map_id, evi_url_format,
         canopy_map_id, canopy_url_format,
-        full_results
+        full_results,
+        assigned_to_majmaah,
+        visible_to_client
       ) VALUES (
         $1, 'baseline', CURRENT_DATE, $2,
         $3, $4, $5, $6, $7,
@@ -56,7 +80,9 @@ export const saveBaselineAssessment = async (data) => {
         $23, $24,
         $25, $26,
         $27, $28,
-        $29
+        $29,
+        false,
+        false
       ) RETURNING id
     `, [
       projectId,
@@ -69,12 +95,12 @@ export const saveBaselineAssessment = async (data) => {
       existingVegetation.treeCount || 0,
       existingVegetation.canopyCoverPercent || 0,
       existingVegetation.averageHealthScore || 0,
-      baselineImagery.ndviStats.mean || 0,
-      baselineImagery.ndviStats.min || -1,
-      baselineImagery.ndviStats.max || 1,
-      baselineImagery.eviStats.mean || 0,
-      baselineImagery.eviStats.min || -1,
-      baselineImagery.eviStats.max || 1,
+      ndviMean,
+      ndviMin,
+      ndviMax,
+      eviMean,
+      eviMin,
+      eviMax,
       agbEstimation.totalAGB || 0,
       agbEstimation.totalAGBTonnes || 0,
       agbEstimation.averageAGB || 0,
@@ -184,18 +210,31 @@ export const unassignFromMajmaah = async (analysisId) => {
 
 /**
  * Get all unassigned analyses (for admin interface)
+ * These are analyses that haven't been assigned to Majmaah dashboard yet
  */
-export const getUnassignedAnalyses = async () => {
-  const result = await pool.query(`
+export const getUnassignedAnalyses = async (projectId = null) => {
+  let query = `
     SELECT 
       id, project_id, analysis_type, analysis_date,
       tree_count, co2_equivalent_tonnes as carbon_tonnes,
       ndvi_mean, canopy_cover_percent,
-      total_area_ha, created_at
+      total_area_ha, created_at,
+      coordinates
     FROM analysis_results
     WHERE assigned_to_majmaah = false
-    ORDER BY created_at DESC
-  `);
+  `;
+  
+  const params = [];
+  if (projectId) {
+    query += ` AND project_id = $1`;
+    params.push(projectId);
+  }
+  
+  query += ` ORDER BY created_at DESC`;
+  
+  const result = params.length > 0
+    ? await pool.query(query, params)
+    : await pool.query(query);
 
   return result.rows;
 };

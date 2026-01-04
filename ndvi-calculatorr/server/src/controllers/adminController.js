@@ -7,7 +7,10 @@ import * as db from '../services/databaseService.js';
  */
 export const getUnassignedAnalyses = async (req, res) => {
   try {
-    const analyses = await db.getUnassignedAnalyses();
+    const { projectId } = req.query;
+    const analyses = await db.getUnassignedAnalyses(projectId ? parseInt(projectId) : null);
+    
+    console.log(`📊 Found ${analyses.length} unassigned analyses${projectId ? ` for project ${projectId}` : ''}`);
     
     res.json({
       success: true,

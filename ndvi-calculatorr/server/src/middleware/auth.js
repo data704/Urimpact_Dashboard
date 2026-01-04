@@ -14,9 +14,23 @@ export const authenticateToken = (req, res, next) => {
     return next();
   }
   
+  // In development, allow demo tokens and invalid tokens (treat as unauthenticated)
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  if (isDevelopment && (token === 'demo-token' || token === 'demo_token')) {
+    req.user = null; // Treat demo token as unauthenticated but allow request
+    return next();
+  }
+  
   const decoded = verifyToken(token);
   
   if (!decoded) {
+    // In development, allow invalid tokens (treat as unauthenticated)
+    if (isDevelopment) {
+      req.user = null;
+      return next();
+    }
+    
+    // In production, reject invalid tokens
     return res.status(401).json({
       success: false,
       error: 'Invalid or expired token'

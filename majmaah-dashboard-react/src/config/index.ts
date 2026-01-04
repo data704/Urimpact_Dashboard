@@ -4,7 +4,7 @@ export const config = {
   // Mapbox configuration
   mapbox: {
     accessToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '',
-    defaultCenter: [45.41665259330084, 25.864738692117708] as [number, number],
+    defaultCenter: [45.416466418084234, 25.870682243900877] as [number, number],
     defaultZoom: 12,
     clusterMaxZoom: 15,
     clusterRadius: 40,

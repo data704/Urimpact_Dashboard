@@ -60,12 +60,15 @@ export const analyzeSiteDefinition = async (coordinates = null) => {
     const startDate = endDate.advance(-BASELINE_WINDOW_DAYS, 'day');
     
     // Get high-resolution Sentinel-2 imagery
+    // Sentinel-2 SR_HARMONIZED stores bands as scaled integers (0-10000)
+    // Multiply by 0.0001 to convert to reflectance (0-1) for accurate index calculations
     const image = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
       .filterBounds(region)
       .filterDate(startDate, endDate)
       .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10))
       .sort('system:time_start', false)
       .first()
+      .multiply(0.0001) // Convert scaled integers to reflectance (0-1)
       .clip(region);
 
     // Calculate NDVI for vegetation detection
@@ -229,19 +232,23 @@ export const analyzeExistingVegetation = async (coordinates = null, options = {}
     const startDate = endDate.advance(-BASELINE_WINDOW_DAYS, 'day');
     
     // Get high-resolution imagery
+    // Sentinel-2 SR_HARMONIZED stores bands as scaled integers (0-10000)
+    // Multiply by 0.0001 to convert to reflectance (0-1) for accurate index calculations
     const image = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
       .filterBounds(region)
       .filterDate(startDate, endDate)
       .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10))
       .sort('system:time_start', false)
       .first()
+      .multiply(0.0001) // Convert scaled integers to reflectance (0-1)
       .clip(region);
 
-    // Calculate NDVI
+    // Calculate NDVI (works correctly with normalizedDifference even on scaled values, but better to use reflectance)
     const ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI');
     // Calculate NDRE (NIR - RedEdge1) / (NIR + RedEdge1)
     const ndre = image.normalizedDifference(['B8', 'B5']).rename('NDRE');
     // EVI (Enhanced Vegetation Index)
+    // EVI formula requires reflectance values (0-1), not scaled integers
     const evi = image.expression(
       '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))',
       {
@@ -409,12 +416,15 @@ export const estimateAGB = async (coordinates = null, options = {}) => {
     const startDate = endDate.advance(-BASELINE_WINDOW_DAYS, 'day');
     
     // Get Sentinel-2 imagery
+    // Sentinel-2 SR_HARMONIZED stores bands as scaled integers (0-10000)
+    // Multiply by 0.0001 to convert to reflectance (0-1) for accurate index calculations
     const image = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
       .filterBounds(region)
       .filterDate(startDate, endDate)
       .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10))
       .sort('system:time_start', false)
       .first()
+      .multiply(0.0001) // Convert scaled integers to reflectance (0-1)
       .clip(region);
 
     const ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI');
@@ -616,18 +626,22 @@ export const generateBaselineImagery = async (coordinates = null) => {
     const startDate = endDate.advance(-BASELINE_WINDOW_DAYS, 'day');
     
     // Get high-resolution Sentinel-2 imagery
+    // Sentinel-2 SR_HARMONIZED stores bands as scaled integers (0-10000)
+    // Multiply by 0.0001 to convert to reflectance (0-1) for accurate index calculations
     const image = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
       .filterBounds(region)
       .filterDate(startDate, endDate)
       .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10))
       .sort('system:time_start', false)
       .first()
+      .multiply(0.0001) // Convert scaled integers to reflectance (0-1)
       .clip(region);
 
-    // Calculate NDVI
+    // Calculate NDVI (works correctly with normalizedDifference even on scaled values, but better to use reflectance)
     const ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI');
     
     // Calculate EVI (Enhanced Vegetation Index)
+    // EVI formula requires reflectance values (0-1), not scaled integers
     const evi = image.expression(
       '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))',
       {

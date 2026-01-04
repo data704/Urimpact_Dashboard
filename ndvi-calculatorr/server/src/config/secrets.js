@@ -113,8 +113,9 @@ export async function initializeSecrets() {
   const useAwsSecrets = process.env.USE_AWS_SECRETS === 'true';
   const nodeEnv = process.env.NODE_ENV || 'development';
 
-  // Only fetch from AWS in production
-  if (useAwsSecrets || nodeEnv === 'production') {
+  // Only fetch from AWS if explicitly enabled AND in production
+  // In development, always use .env file
+  if ((useAwsSecrets && nodeEnv === 'production') || (useAwsSecrets && process.env.AWS_REGION)) {
     try {
       // Initialize AWS SDK
       const sdkAvailable = await initAwsSdk();

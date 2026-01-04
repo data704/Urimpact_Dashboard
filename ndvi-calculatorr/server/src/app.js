@@ -36,44 +36,60 @@ if (process.env.NODE_ENV === 'development') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Rate limiting
+// CORS configuration - MUST be before rate limiting to allow OPTIONS preflight
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+  : [
+      'http://localhost:5173',  // NDVI Calculator (Vite default)
+      'http://127.0.0.1:5173',
+      'http://localhost:5175',
+      'http://127.0.0.1:5175',
+      'http://localhost:3001',  // Majmaah Dashboard
+      'http://127.0.0.1:3001',
+    ];
+
+// Log CORS configuration on startup
+console.log('🌐 CORS Origins:', corsOrigins);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like curl or mobile apps)
+      if (!origin) {
+        return callback(null, true);
+      }
+      
+      // Check if origin is in allowed list
+      if (corsOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      
+      // Log blocked CORS requests with helpful message
+      console.warn(`⚠️  CORS blocked request from origin: ${origin}`);
+      console.warn(`   Allowed origins: ${corsOrigins.join(', ')}`);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'DELETE', 'PATCH', 'OPTIONS', 'PUT'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true, // Allow credentials for JWT tokens
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  })
+);
+
+// Rate limiting - AFTER CORS to allow OPTIONS preflight requests
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for OPTIONS preflight requests
+    return req.method === 'OPTIONS';
+  },
 });
 app.use('/api', limiter);
-
-// CORS configuration
-const corsOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-  : [
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'http://localhost:5175',
-      'http://127.0.0.1:5175',
-      'http://localhost:3001',
-      'http://127.0.0.1:3001',
-    ];
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like curl or mobile apps)
-      if (!origin) return callback(null, true);
-      if (corsOrigins.includes(origin)) return callback(null, true);
-      
-      // Log blocked CORS requests
-      console.warn(`⚠️  CORS blocked request from origin: ${origin}`);
-      return callback(new Error('Not allowed by CORS'));
-    },
-    methods: ['GET', 'POST', 'DELETE', 'PATCH', 'OPTIONS', 'PUT'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true, // Allow credentials for JWT tokens
-  })
-);
 
 // Health check endpoint (before other routes)
 app.get('/api/health', (req, res) => {
@@ -82,6 +98,16 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
+  });
+});
+
+// Debug endpoint to check CORS configuration
+app.get('/api/debug/cors', (req, res) => {
+  res.json({
+    corsOrigins: corsOrigins,
+    corsOriginsEnv: process.env.CORS_ORIGINS,
+    requestOrigin: req.headers.origin,
+    allowed: corsOrigins.includes(req.headers.origin || ''),
   });
 });
 

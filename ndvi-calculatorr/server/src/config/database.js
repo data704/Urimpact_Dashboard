@@ -16,8 +16,10 @@ export const pool = new Pool({
   idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
   connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '5000', 10),
 
-  // ✅ FIX: Always use SSL in production (RDS requirement)
-  ssl: process.env.NODE_ENV === 'production'
+  // ✅ FIX: Use SSL only if DB_SSL is explicitly set to 'true'
+  // For local development, DB_SSL should be 'false' or not set
+  // For AWS RDS, DB_SSL should be 'true'
+  ssl: process.env.DB_SSL === 'true'
     ? { rejectUnauthorized: false }
     : false,
 

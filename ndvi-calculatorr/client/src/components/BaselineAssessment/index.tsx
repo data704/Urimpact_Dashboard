@@ -161,7 +161,7 @@ const BaselineAssessment: React.FC = () => {
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: styleId,
-      center: [46.690194610355434, 24.595934489336507], // Correct center coordinates
+      center: [45.416466418084234, 25.870682243900877], // Majmaah University
       zoom: 15 // Closer zoom to see trees better
     });
 
