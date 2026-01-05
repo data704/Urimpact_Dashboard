@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserRole } from '@/types';
+import { config } from '@/config';
 
 interface User {
   id: number;
@@ -33,9 +34,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
+    // Get API base URL from config (uses VITE_API_BASE_URL env variable)
+    const apiBaseUrl = config.api.baseUrl;
+    const isProduction = !apiBaseUrl.includes('localhost');
+    
     try {
-      // Call real authentication API
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      // Call real authentication API using config base URL
+      const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -43,9 +48,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify({ email, password }),
       });
 
+      // Check if response is ok before parsing JSON
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Login failed' }));
+        throw new Error(errorData.error || `Login failed: ${response.status} ${response.statusText}`);
+      }
+
       const data = await response.json();
 
-      if (response.ok && data.success && data.data.token) {
+      if (data.success && data.data?.token) {
         const token = data.data.token;
         const userData = data.data.user;
 
@@ -60,12 +71,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(user);
         localStorage.setItem('user', JSON.stringify(user));
         localStorage.setItem('token', token);
+        return; // Success - exit early
       } else {
-        throw new Error(data.error || 'Login failed');
+        throw new Error(data.error || 'Login failed: Invalid response');
       }
     } catch (error) {
-      // Fallback to mock login for demo mode
-      console.warn('Real auth failed, using demo mode:', error);
+      // In production, throw the error instead of silently falling back to demo mode
+      if (isProduction) {
+        console.error('Authentication failed:', error);
+        throw error; // Re-throw to let the Login component handle it
+      }
+      
+      // Only fallback to demo mode in development
+      console.warn('Real auth failed, using demo mode (development only):', error);
       
       // Determine role based on email for demo mode
       let role = UserRole.ADVANCEDCLIENT;
