@@ -494,20 +494,35 @@ export const getSpeciesRichnessData = async (projectId = 1, userId = null) => {
 
 /**
  * Get ecosystem services scores (for radar chart)
+ * Filters by user assignments if userId is provided
  */
-export const getEcosystemServices = async (projectId = 1) => {
-  const result = await pool.query(`
+export const getEcosystemServices = async (projectId = 1, userId = null) => {
+  let query = `
     SELECT 
-      air_quality_score,
-      water_retention_score,
-      biodiversity_score,
-      soil_health_score,
-      carbon_storage_score
-    FROM calculated_metrics
-    WHERE project_id = $1
-    ORDER BY metric_date DESC
-    LIMIT 1
-  `, [projectId]);
+      cm.air_quality_score,
+      cm.water_retention_score,
+      cm.biodiversity_score,
+      cm.soil_health_score,
+      cm.carbon_storage_score
+    FROM calculated_metrics cm
+    JOIN analysis_results ar ON cm.analysis_id = ar.id
+    WHERE ar.project_id = $1
+    AND ar.assigned_to_majmaah = true
+  `;
+  
+  const params = [projectId];
+  
+  // If userId is provided, filter by user assignments
+  if (userId) {
+    query += ` AND ar.id IN (
+      SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+    )`;
+    params.push(userId);
+  }
+  
+  query += ` ORDER BY cm.metric_date DESC LIMIT 1`;
+  
+  const result = await pool.query(query, params);
 
   if (result.rows.length === 0) {
     return [
@@ -531,16 +546,29 @@ export const getEcosystemServices = async (projectId = 1) => {
 
 /**
  * Get vegetation health distribution (for pie chart)
+ * Filters by user assignments if userId is provided
  */
-export const getVegetationHealthDistribution = async (projectId = 1) => {
-  const result = await pool.query(`
+export const getVegetationHealthDistribution = async (projectId = 1, userId = null) => {
+  let query = `
     SELECT trees_geojson
-    FROM analysis_results
-    WHERE project_id = $1
-    AND assigned_to_majmaah = true
-    ORDER BY analysis_date DESC
-    LIMIT 1
-  `, [projectId]);
+    FROM analysis_results ar
+    WHERE ar.project_id = $1
+    AND ar.assigned_to_majmaah = true
+  `;
+  
+  const params = [projectId];
+  
+  // If userId is provided, filter by user assignments
+  if (userId) {
+    query += ` AND ar.id IN (
+      SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+    )`;
+    params.push(userId);
+  }
+  
+  query += ` ORDER BY ar.analysis_date DESC LIMIT 1`;
+  
+  const result = await pool.query(query, params);
 
   if (result.rows.length === 0 || !result.rows[0].trees_geojson) {
     return [
@@ -568,17 +596,33 @@ export const getVegetationHealthDistribution = async (projectId = 1) => {
 
 /**
  * Get survival rate data over years (for line chart)
+ * Filters by user assignments if userId is provided
  */
-export const getSurvivalRateData = async (projectId = 1) => {
-  const result = await pool.query(`
+export const getSurvivalRateData = async (projectId = 1, userId = null) => {
+  let query = `
     SELECT 
-      EXTRACT(YEAR FROM metric_date)::INTEGER as year,
-      AVG(survival_rate_percent) as rate
-    FROM calculated_metrics
-    WHERE project_id = $1
-    GROUP BY EXTRACT(YEAR FROM metric_date)
-    ORDER BY year ASC
-  `, [projectId]);
+      EXTRACT(YEAR FROM cm.metric_date)::INTEGER as year,
+      AVG(cm.survival_rate_percent) as rate
+    FROM calculated_metrics cm
+    JOIN analysis_results ar ON cm.analysis_id = ar.id
+    WHERE ar.project_id = $1
+    AND ar.assigned_to_majmaah = true
+  `;
+  
+  const params = [projectId];
+  
+  // If userId is provided, filter by user assignments
+  if (userId) {
+    query += ` AND ar.id IN (
+      SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+    )`;
+    params.push(userId);
+  }
+  
+  query += ` GROUP BY EXTRACT(YEAR FROM cm.metric_date)
+    ORDER BY year ASC`;
+  
+  const result = await pool.query(query, params);
 
   if (result.rows.length === 0) {
     // Return default progression
@@ -599,30 +643,56 @@ export const getSurvivalRateData = async (projectId = 1) => {
 
 /**
  * Get growth and carbon impact data (for composed chart)
+ * Filters by user assignments if userId is provided
  */
-export const getGrowthCarbonImpact = async (projectId = 1, months = 12) => {
-  const result = await pool.query(`
+export const getGrowthCarbonImpact = async (projectId = 1, months = 12, userId = null) => {
+  let query = `
     SELECT 
-      TO_CHAR(metric_date, 'Mon') as month,
-      AVG(tree_growth_cm) as growth,
-      AVG(carbon_growth_kg) as carbon
-    FROM calculated_metrics
-    WHERE project_id = $1
-    AND metric_date >= CURRENT_DATE - INTERVAL '${months} months'
-    GROUP BY metric_date, TO_CHAR(metric_date, 'Mon')
-    ORDER BY metric_date ASC
-  `, [projectId]);
+      TO_CHAR(cm.metric_date, 'Mon') as month,
+      AVG(cm.tree_growth_cm) as growth,
+      AVG(cm.carbon_growth_kg) as carbon
+    FROM calculated_metrics cm
+    JOIN analysis_results ar ON cm.analysis_id = ar.id
+    WHERE ar.project_id = $1
+    AND ar.assigned_to_majmaah = true
+    AND cm.metric_date >= CURRENT_DATE - INTERVAL '${months} months'
+  `;
+  
+  const params = [projectId];
+  
+  // If userId is provided, filter by user assignments
+  if (userId) {
+    query += ` AND ar.id IN (
+      SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+    )`;
+    params.push(userId);
+  }
+  
+  query += ` GROUP BY cm.metric_date, TO_CHAR(cm.metric_date, 'Mon')
+    ORDER BY cm.metric_date ASC`;
+  
+  const result = await pool.query(query, params);
 
-  // If no data, return projections based on latest analysis
-  if (result.rows.length === 0) {
-    const latest = await pool.query(`
-      SELECT tree_count, co2_equivalent_tonnes
-      FROM analysis_results
-      WHERE project_id = $1
-      AND assigned_to_majmaah = true
-      ORDER BY analysis_date DESC
-      LIMIT 1
-    `, [projectId]);
+    // If no data, return projections based on latest analysis
+    if (result.rows.length === 0) {
+      let latestQuery = `
+        SELECT tree_count, co2_equivalent_tonnes
+        FROM analysis_results ar
+        WHERE ar.project_id = $1
+        AND ar.assigned_to_majmaah = true
+      `;
+      const latestParams = [projectId];
+      
+      if (userId) {
+        latestQuery += ` AND ar.id IN (
+          SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+        )`;
+        latestParams.push(userId);
+      }
+      
+      latestQuery += ` ORDER BY ar.analysis_date DESC LIMIT 1`;
+      
+      const latest = await pool.query(latestQuery, latestParams);
 
     if (latest.rows.length === 0) {
       return [];
@@ -692,34 +762,58 @@ export const getMajmaahTreesForMap = async (projectId = 1, userId = null) => {
 
 /**
  * Get NDVI trends over time (for line chart)
+ * Filters by user assignments if userId is provided
  */
-export const getNDVITrends = async (projectId = 1, months = 12) => {
-  const result = await pool.query(`
+export const getNDVITrends = async (projectId = 1, months = 12, userId = null) => {
+  let query = `
     SELECT 
-      TO_CHAR(analysis_date, 'Mon') as month,
-      AVG(ndvi_mean) as value,
-      MIN(ndvi_min) as min_value,
-      MAX(ndvi_max) as max_value
-    FROM analysis_results
-    WHERE project_id = $1
-    AND assigned_to_majmaah = true
-    AND analysis_date >= CURRENT_DATE - INTERVAL '${months} months'
-    AND ndvi_mean IS NOT NULL
-    GROUP BY analysis_date, TO_CHAR(analysis_date, 'Mon')
-    ORDER BY analysis_date ASC
-  `, [projectId]);
+      TO_CHAR(ar.analysis_date, 'Mon') as month,
+      AVG(ar.ndvi_mean) as value,
+      MIN(ar.ndvi_min) as min_value,
+      MAX(ar.ndvi_max) as max_value
+    FROM analysis_results ar
+    WHERE ar.project_id = $1
+    AND ar.assigned_to_majmaah = true
+    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${months} months'
+    AND ar.ndvi_mean IS NOT NULL
+  `;
+  
+  const params = [projectId];
+  
+  // If userId is provided, filter by user assignments
+  if (userId) {
+    query += ` AND ar.id IN (
+      SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+    )`;
+    params.push(userId);
+  }
+  
+  query += ` GROUP BY ar.analysis_date, TO_CHAR(ar.analysis_date, 'Mon')
+    ORDER BY ar.analysis_date ASC`;
+  
+  const result = await pool.query(query, params);
 
   // If no data, return mock progression based on latest analysis
   if (result.rows.length === 0) {
-    const latest = await pool.query(`
+    let latestQuery = `
       SELECT ndvi_mean, ndvi_min, ndvi_max
-      FROM analysis_results
-      WHERE project_id = $1
-      AND assigned_to_majmaah = true
-      AND ndvi_mean IS NOT NULL
-      ORDER BY analysis_date DESC
-      LIMIT 1
-    `, [projectId]);
+      FROM analysis_results ar
+      WHERE ar.project_id = $1
+      AND ar.assigned_to_majmaah = true
+      AND ar.ndvi_mean IS NOT NULL
+    `;
+    const latestParams = [projectId];
+    
+    if (userId) {
+      latestQuery += ` AND ar.id IN (
+        SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+      )`;
+      latestParams.push(userId);
+    }
+    
+    latestQuery += ` ORDER BY ar.analysis_date DESC LIMIT 1`;
+    
+    const latest = await pool.query(latestQuery, latestParams);
 
     if (latest.rows.length === 0) {
       return [];
@@ -742,34 +836,58 @@ export const getNDVITrends = async (projectId = 1, months = 12) => {
 
 /**
  * Get EVI trends over time (for line chart)
+ * Filters by user assignments if userId is provided
  */
-export const getEVITrends = async (projectId = 1, months = 12) => {
-  const result = await pool.query(`
+export const getEVITrends = async (projectId = 1, months = 12, userId = null) => {
+  let query = `
     SELECT 
-      TO_CHAR(analysis_date, 'Mon') as month,
-      AVG(evi_mean) as value,
-      MIN(evi_min) as min_value,
-      MAX(evi_max) as max_value
-    FROM analysis_results
-    WHERE project_id = $1
-    AND assigned_to_majmaah = true
-    AND analysis_date >= CURRENT_DATE - INTERVAL '${months} months'
-    AND evi_mean IS NOT NULL
-    GROUP BY analysis_date, TO_CHAR(analysis_date, 'Mon')
-    ORDER BY analysis_date ASC
-  `, [projectId]);
+      TO_CHAR(ar.analysis_date, 'Mon') as month,
+      AVG(ar.evi_mean) as value,
+      MIN(ar.evi_min) as min_value,
+      MAX(ar.evi_max) as max_value
+    FROM analysis_results ar
+    WHERE ar.project_id = $1
+    AND ar.assigned_to_majmaah = true
+    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${months} months'
+    AND ar.evi_mean IS NOT NULL
+  `;
+  
+  const params = [projectId];
+  
+  // If userId is provided, filter by user assignments
+  if (userId) {
+    query += ` AND ar.id IN (
+      SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+    )`;
+    params.push(userId);
+  }
+  
+  query += ` GROUP BY ar.analysis_date, TO_CHAR(ar.analysis_date, 'Mon')
+    ORDER BY ar.analysis_date ASC`;
+  
+  const result = await pool.query(query, params);
 
   // If no data, return mock progression based on latest analysis
   if (result.rows.length === 0) {
-    const latest = await pool.query(`
+    let latestQuery = `
       SELECT evi_mean, evi_min, evi_max
-      FROM analysis_results
-      WHERE project_id = $1
-      AND assigned_to_majmaah = true
-      AND evi_mean IS NOT NULL
-      ORDER BY analysis_date DESC
-      LIMIT 1
-    `, [projectId]);
+      FROM analysis_results ar
+      WHERE ar.project_id = $1
+      AND ar.assigned_to_majmaah = true
+      AND ar.evi_mean IS NOT NULL
+    `;
+    const latestParams = [projectId];
+    
+    if (userId) {
+      latestQuery += ` AND ar.id IN (
+        SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+      )`;
+      latestParams.push(userId);
+    }
+    
+    latestQuery += ` ORDER BY ar.analysis_date DESC LIMIT 1`;
+    
+    const latest = await pool.query(latestQuery, latestParams);
 
     if (latest.rows.length === 0) {
       return [];
@@ -792,32 +910,56 @@ export const getEVITrends = async (projectId = 1, months = 12) => {
 
 /**
  * Get Above Ground Carbon (AGC) trends over time (for line chart)
+ * Filters by user assignments if userId is provided
  */
-export const getAGCTrends = async (projectId = 1, months = 12) => {
-  const result = await pool.query(`
+export const getAGCTrends = async (projectId = 1, months = 12, userId = null) => {
+  let query = `
     SELECT 
-      TO_CHAR(analysis_date, 'Mon') as month,
-      COALESCE(SUM(total_agc_tonnes), SUM(total_agb_tonnes * 0.47), 0) as value
-    FROM analysis_results
-    WHERE project_id = $1
-    AND assigned_to_majmaah = true
-    AND analysis_date >= CURRENT_DATE - INTERVAL '${months} months'
-    AND (total_agc_tonnes IS NOT NULL OR total_agb_tonnes IS NOT NULL)
-    GROUP BY analysis_date, TO_CHAR(analysis_date, 'Mon')
-    ORDER BY analysis_date ASC
-  `, [projectId]);
+      TO_CHAR(ar.analysis_date, 'Mon') as month,
+      COALESCE(SUM(ar.total_agc_tonnes), SUM(ar.total_agb_tonnes * 0.47), 0) as value
+    FROM analysis_results ar
+    WHERE ar.project_id = $1
+    AND ar.assigned_to_majmaah = true
+    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${months} months'
+    AND (ar.total_agc_tonnes IS NOT NULL OR ar.total_agb_tonnes IS NOT NULL)
+  `;
+  
+  const params = [projectId];
+  
+  // If userId is provided, filter by user assignments
+  if (userId) {
+    query += ` AND ar.id IN (
+      SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+    )`;
+    params.push(userId);
+  }
+  
+  query += ` GROUP BY ar.analysis_date, TO_CHAR(ar.analysis_date, 'Mon')
+    ORDER BY ar.analysis_date ASC`;
+  
+  const result = await pool.query(query, params);
 
   // If no data, return mock progression based on latest analysis
   if (result.rows.length === 0) {
-    const latest = await pool.query(`
+    let latestQuery = `
       SELECT total_agc_tonnes, total_agb_tonnes
-      FROM analysis_results
-      WHERE project_id = $1
-      AND assigned_to_majmaah = true
-      AND (total_agc_tonnes IS NOT NULL OR total_agb_tonnes IS NOT NULL)
-      ORDER BY analysis_date DESC
-      LIMIT 1
-    `, [projectId]);
+      FROM analysis_results ar
+      WHERE ar.project_id = $1
+      AND ar.assigned_to_majmaah = true
+      AND (ar.total_agc_tonnes IS NOT NULL OR ar.total_agb_tonnes IS NOT NULL)
+    `;
+    const latestParams = [projectId];
+    
+    if (userId) {
+      latestQuery += ` AND ar.id IN (
+        SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+      )`;
+      latestParams.push(userId);
+    }
+    
+    latestQuery += ` ORDER BY ar.analysis_date DESC LIMIT 1`;
+    
+    const latest = await pool.query(latestQuery, latestParams);
 
     if (latest.rows.length === 0) {
       return [];
@@ -842,20 +984,33 @@ export const getAGCTrends = async (projectId = 1, months = 12) => {
 /**
  * Get Vegetation Health Index distribution (for bar/pie chart)
  * Based on average health scores and NDVI values
+ * Filters by user assignments if userId is provided
  */
-export const getVegetationHealthIndex = async (projectId = 1) => {
-  const result = await pool.query(`
+export const getVegetationHealthIndex = async (projectId = 1, userId = null) => {
+  let query = `
     SELECT 
-      trees_geojson,
-      average_health_score,
-      ndvi_mean,
-      canopy_cover_percent
-    FROM analysis_results
-    WHERE project_id = $1
-    AND assigned_to_majmaah = true
-    ORDER BY analysis_date DESC
-    LIMIT 1
-  `, [projectId]);
+      ar.trees_geojson,
+      ar.average_health_score,
+      ar.ndvi_mean,
+      ar.canopy_cover_percent
+    FROM analysis_results ar
+    WHERE ar.project_id = $1
+    AND ar.assigned_to_majmaah = true
+  `;
+  
+  const params = [projectId];
+  
+  // If userId is provided, filter by user assignments
+  if (userId) {
+    query += ` AND ar.id IN (
+      SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+    )`;
+    params.push(userId);
+  }
+  
+  query += ` ORDER BY ar.analysis_date DESC LIMIT 1`;
+  
+  const result = await pool.query(query, params);
 
   if (result.rows.length === 0) {
     return [

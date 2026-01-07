@@ -50,3 +50,8 @@ docker-compose.override.yml
 *.temp
 
 
+
+# Documentation files (except README)
+*.md
+!README.md
+!**/README.md

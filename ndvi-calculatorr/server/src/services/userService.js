@@ -180,17 +180,60 @@ export const verifyToken = (token) => {
 
 /**
  * Assign analysis to user
+ * IMPORTANT: A user can only have ONE analysis assigned at a time
+ * If user already has an analysis assigned, the old assignment is removed and replaced with the new one
  */
 export const assignAnalysisToUser = async (userId, analysisId, assignedBy, notes = null) => {
-  const result = await pool.query(`
-    INSERT INTO user_analysis_assignments (user_id, analysis_id, assigned_by, notes)
-    VALUES ($1, $2, $3, $4)
-    ON CONFLICT (user_id, analysis_id) DO UPDATE
-    SET assigned_at = NOW(), notes = $4
-    RETURNING *
-  `, [userId, analysisId, assignedBy, notes]);
-  
-  return result.rows[0];
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Check if user already has an analysis assigned
+    const existingAssignment = await client.query(`
+      SELECT id, analysis_id 
+      FROM user_analysis_assignments 
+      WHERE user_id = $1
+    `, [userId]);
+    
+    // If user has an existing assignment (different analysis), remove it first
+    if (existingAssignment.rows.length > 0) {
+      const existingAnalysisId = existingAssignment.rows[0].analysis_id;
+      
+      // If trying to assign the same analysis, just update it
+      if (existingAnalysisId === analysisId) {
+        const result = await client.query(`
+          UPDATE user_analysis_assignments
+          SET assigned_at = NOW(), notes = $3, assigned_by = $4
+          WHERE user_id = $1 AND analysis_id = $2
+          RETURNING *
+        `, [userId, analysisId, notes, assignedBy]);
+        
+        await client.query('COMMIT');
+        return result.rows[0];
+      }
+      
+      // Remove existing assignment (user can only have 1 analysis at a time)
+      await client.query(`
+        DELETE FROM user_analysis_assignments
+        WHERE user_id = $1 AND analysis_id = $2
+      `, [userId, existingAnalysisId]);
+    }
+    
+    // Insert new assignment
+    const result = await client.query(`
+      INSERT INTO user_analysis_assignments (user_id, analysis_id, assigned_by, notes)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `, [userId, analysisId, assignedBy, notes]);
+    
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 /**
@@ -256,28 +299,35 @@ export const unassignAnalysisFromUser = async (userId, analysisId) => {
 
 /**
  * Bulk assign analyses to user
+ * IMPORTANT: A user can only have ONE analysis assigned at a time
+ * This function will assign only the FIRST analysis and remove any existing assignments
  */
 export const bulkAssignAnalysesToUser = async (userId, analysisIds, assignedBy) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     
-    const assignments = [];
-    for (const analysisId of analysisIds) {
+    // Remove all existing assignments (user can only have 1 analysis)
+    await client.query(`
+      DELETE FROM user_analysis_assignments
+      WHERE user_id = $1
+    `, [userId]);
+    
+    // Assign only the first analysis (if provided)
+    if (analysisIds.length > 0) {
+      const analysisId = analysisIds[0]; // Only assign the first one
       const result = await client.query(`
         INSERT INTO user_analysis_assignments (user_id, analysis_id, assigned_by)
         VALUES ($1, $2, $3)
-        ON CONFLICT (user_id, analysis_id) DO NOTHING
         RETURNING *
       `, [userId, analysisId, assignedBy]);
       
-      if (result.rows.length > 0) {
-        assignments.push(result.rows[0]);
-      }
+      await client.query('COMMIT');
+      return [result.rows[0]]; // Return array with single assignment
     }
     
     await client.query('COMMIT');
-    return assignments;
+    return []; // No assignments made
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

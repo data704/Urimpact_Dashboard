@@ -182,10 +182,11 @@ router.get('/majmaah/species-richness', authenticateToken, async (req, res) => {
 /**
  * Get ecosystem services scores (for Radar Chart)
  */
-router.get('/majmaah/ecosystem-services', async (req, res) => {
+router.get('/majmaah/ecosystem-services', authenticateToken, async (req, res) => {
   try {
     const { projectId = 1 } = req.query;
-    const data = await db.getEcosystemServices(parseInt(projectId));
+    const userId = req.user?.userId || null;
+    const data = await db.getEcosystemServices(parseInt(projectId), userId);
     
     res.json({
       success: true,
@@ -203,10 +204,11 @@ router.get('/majmaah/ecosystem-services', async (req, res) => {
 /**
  * Get vegetation health distribution (for Pie Chart)
  */
-router.get('/majmaah/vegetation-health', async (req, res) => {
+router.get('/majmaah/vegetation-health', authenticateToken, async (req, res) => {
   try {
     const { projectId = 1 } = req.query;
-    const data = await db.getVegetationHealthDistribution(parseInt(projectId));
+    const userId = req.user?.userId || null;
+    const data = await db.getVegetationHealthDistribution(parseInt(projectId), userId);
     
     res.json({
       success: true,
@@ -224,10 +226,11 @@ router.get('/majmaah/vegetation-health', async (req, res) => {
 /**
  * Get survival rate trends (for Line Chart)
  */
-router.get('/majmaah/survival-rate', async (req, res) => {
+router.get('/majmaah/survival-rate', authenticateToken, async (req, res) => {
   try {
     const { projectId = 1 } = req.query;
-    const data = await db.getSurvivalRateData(parseInt(projectId));
+    const userId = req.user?.userId || null;
+    const data = await db.getSurvivalRateData(parseInt(projectId), userId);
     
     res.json({
       success: true,
@@ -245,10 +248,11 @@ router.get('/majmaah/survival-rate', async (req, res) => {
 /**
  * Get growth and carbon impact data (for Composed Chart)
  */
-router.get('/majmaah/growth-carbon-impact', async (req, res) => {
+router.get('/majmaah/growth-carbon-impact', authenticateToken, async (req, res) => {
   try {
     const { projectId = 1, months = 12 } = req.query;
-    const data = await db.getGrowthCarbonImpact(parseInt(projectId), parseInt(months));
+    const userId = req.user?.userId || null;
+    const data = await db.getGrowthCarbonImpact(parseInt(projectId), parseInt(months), userId);
     
     res.json({
       success: true,
@@ -316,10 +320,11 @@ router.get('/majmaah/analysis/:analysisId', async (req, res) => {
 /**
  * Get NDVI trends over time (for Line Chart)
  */
-router.get('/majmaah/ndvi-trends', async (req, res) => {
+router.get('/majmaah/ndvi-trends', authenticateToken, async (req, res) => {
   try {
     const { projectId = 1, months = 12 } = req.query;
-    const trends = await db.getNDVITrends(parseInt(projectId), parseInt(months));
+    const userId = req.user?.userId || null;
+    const trends = await db.getNDVITrends(parseInt(projectId), parseInt(months), userId);
     
     res.json({
       success: true,
@@ -337,10 +342,11 @@ router.get('/majmaah/ndvi-trends', async (req, res) => {
 /**
  * Get EVI trends over time (for Line Chart)
  */
-router.get('/majmaah/evi-trends', async (req, res) => {
+router.get('/majmaah/evi-trends', authenticateToken, async (req, res) => {
   try {
     const { projectId = 1, months = 12 } = req.query;
-    const trends = await db.getEVITrends(parseInt(projectId), parseInt(months));
+    const userId = req.user?.userId || null;
+    const trends = await db.getEVITrends(parseInt(projectId), parseInt(months), userId);
     
     res.json({
       success: true,
@@ -358,10 +364,11 @@ router.get('/majmaah/evi-trends', async (req, res) => {
 /**
  * Get Vegetation Health Index distribution (for Bar/Pie Chart)
  */
-router.get('/majmaah/vegetation-health-index', async (req, res) => {
+router.get('/majmaah/vegetation-health-index', authenticateToken, async (req, res) => {
   try {
     const { projectId = 1 } = req.query;
-    const data = await db.getVegetationHealthIndex(parseInt(projectId));
+    const userId = req.user?.userId || null;
+    const data = await db.getVegetationHealthIndex(parseInt(projectId), userId);
     
     res.json({
       success: true,
@@ -379,10 +386,11 @@ router.get('/majmaah/vegetation-health-index', async (req, res) => {
 /**
  * Get Above Ground Carbon (AGC) trends over time (for Line Chart)
  */
-router.get('/majmaah/agc-trends', async (req, res) => {
+router.get('/majmaah/agc-trends', authenticateToken, async (req, res) => {
   try {
     const { projectId = 1, months = 12 } = req.query;
-    const trends = await db.getAGCTrends(parseInt(projectId), parseInt(months));
+    const userId = req.user?.userId || null;
+    const trends = await db.getAGCTrends(parseInt(projectId), parseInt(months), userId);
     
     res.json({
       success: true,

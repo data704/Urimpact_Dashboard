@@ -226,6 +226,48 @@ export const assignAnalysisToUser = async (req, res) => {
       });
     }
     
+    // Check if user already has an analysis assigned
+    const existingAssignments = await userService.getUserAssignedAnalyses(parseInt(userId));
+    
+    if (existingAssignments.length > 0) {
+      const existingAnalysisId = existingAssignments[0].analysis_id;
+      
+      // If assigning the same analysis, just update it
+      if (existingAnalysisId === parseInt(analysisId)) {
+        const assignment = await userService.assignAnalysisToUser(
+          parseInt(userId),
+          parseInt(analysisId),
+          assignedBy,
+          notes
+        );
+        
+        return res.json({
+          success: true,
+          message: 'Assignment updated',
+          data: assignment
+        });
+      }
+      
+      // User already has a different analysis assigned
+      // The service will automatically replace it, but we inform the client
+      const assignment = await userService.assignAnalysisToUser(
+        parseInt(userId),
+        parseInt(analysisId),
+        assignedBy,
+        notes
+      );
+      
+      return res.json({
+        success: true,
+        message: `Previous analysis (ID: ${existingAnalysisId}) was replaced with new assignment`,
+        data: assignment,
+        replaced: {
+          previousAnalysisId: existingAnalysisId
+        }
+      });
+    }
+    
+    // No existing assignment, create new one
     const assignment = await userService.assignAnalysisToUser(
       parseInt(userId),
       parseInt(analysisId),
@@ -235,6 +277,7 @@ export const assignAnalysisToUser = async (req, res) => {
     
     res.json({
       success: true,
+      message: 'Analysis assigned successfully',
       data: assignment
     });
   } catch (error) {
