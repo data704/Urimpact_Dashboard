@@ -111,20 +111,6 @@ const LoginPage: React.FC = () => {
             )}
           </button>
         </form>
-
-        <div className="login-footer">
-          <div className="default-credentials">
-            <p className="credentials-title">Default Admin Credentials:</p>
-            <div className="credentials-info">
-              <div>
-                <strong>Email:</strong> admin@urimpact.com
-              </div>
-              <div>
-                <strong>Password:</strong> admin123
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

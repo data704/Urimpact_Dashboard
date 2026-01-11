@@ -147,19 +147,6 @@ export const Login: React.FC = () => {
               {isLoading ? t('login.signingIn') : t('login.signIn')}
             </button>
           </form>
-
-          {/* Demo hint */}
-          <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-800 text-center mb-2">
-              <strong>Demo Mode:</strong> Enter any email/password to sign in
-            </p>
-            <p className="text-xs text-blue-700 text-center">
-              <strong>Admin Login:</strong> Use email containing "admin" (e.g., admin@urimpact.com) for admin access
-            </p>
-            <p className="text-xs text-blue-600 text-center mt-1">
-              <strong>Real Backend:</strong> Use admin@urimpact.com / admin123 if backend is running
-            </p>
-          </div>
         </div>
       </div>
     </div>
