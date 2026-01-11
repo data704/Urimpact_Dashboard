@@ -35,7 +35,11 @@ const LoginPage: React.FC = () => {
       <div className="login-container">
         <div className="login-header">
           <div className="login-logo">
-            <span className="logo-icon">🌳</span>
+            <img
+              src="/assets/img/URIMPACT_LOGO.png"
+              alt="URIMPACT"
+              className="login-logo-img"
+            />
             <h1>NDVI Admin Dashboard</h1>
           </div>
           <p className="login-subtitle">Sign in to manage users and analyses</p>

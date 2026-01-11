@@ -47,16 +47,13 @@ export const Login: React.FC = () => {
       {/* Right side - Login Form */}
       <div className="flex-1 lg:flex-initial lg:w-[540px] flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
-          {/* Logo with Teal Icon */}
+          {/* Logo */}
           <div className="flex items-center justify-center mb-12">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-[#13c5bc] rounded-lg flex items-center justify-center">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span className="text-2xl font-bold text-gray-900">URIMPACT</span>
-            </div>
+            <img
+              src="/assets/img/URIMPACT_LOGO.png"
+              alt="URIMPACT"
+              className="h-16 w-auto"
+            />
           </div>
 
           {/* Title */}

@@ -47,6 +47,12 @@
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
+.login-logo-img {
+  height: 60px;
+  width: auto;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
 .login-header h1 {
   font-size: 1.75rem;
   font-weight: 700;
