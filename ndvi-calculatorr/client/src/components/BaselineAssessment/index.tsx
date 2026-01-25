@@ -151,6 +151,7 @@ const BaselineAssessment: React.FC = () => {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [vegetationMode, setVegetationMode] = useState<'mature' | 'young'>('mature');
+  const [historicalMonths, setHistoricalMonths] = useState<number>(12);
   const [baselineData, setBaselineData] = useState<BaselineData | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'site' | 'vegetation' | 'agb' | 'imagery'>('overview');
   const [drawnAreaSize, setDrawnAreaSize] = useState<number | null>(null);
@@ -309,10 +310,25 @@ const BaselineAssessment: React.FC = () => {
 
       // Check if area is too large (optional warning)
       const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+      
+      // Ensure historicalMonths is sent as a number
+      const requestBody = { 
+        coordinates, 
+        vegetationMode, 
+        historicalMonths: Number(historicalMonths) || 12 
+      };
+      
+      console.log('🚀 Sending baseline assessment request:', {
+        coordinates: coordinates?.length,
+        vegetationMode,
+        historicalMonths: requestBody.historicalMonths,
+        type: typeof requestBody.historicalMonths
+      });
+      
       const response = await fetch(`${API_BASE}/baseline-assessment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coordinates, vegetationMode })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) throw new Error('Failed to run baseline assessment');
@@ -1212,6 +1228,41 @@ const BaselineAssessment: React.FC = () => {
             </div>
           </div>
 
+          <div className="tools-section">
+            <h3>Analysis Configuration</h3>
+            <div className="instructions-box">
+              <p><strong>Historical Months:</strong> Number of months of historical satellite data to fetch from Google Earth Engine.</p>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.5rem' }}>
+                More months = longer processing time but richer trend data. Default: 12 months.
+              </p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.875rem', color: '#334155', fontWeight: '500' }}>
+                Historical Data Months (1-24)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                value={historicalMonths}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val) && val >= 1 && val <= 24) {
+                    setHistoricalMonths(val);
+                  }
+                }}
+                style={{ 
+                  border: '1px solid #e2e8f0', 
+                  borderRadius: '6px', 
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.9rem',
+                  width: '100%'
+                }}
+                title="Number of months of historical data to fetch (1-24 months)"
+              />
+            </div>
+          </div>
+
           <div className="tabs">
             <button 
               className={activeTab === 'overview' ? 'tab active' : 'tab'}
@@ -1303,6 +1354,31 @@ const BaselineAssessment: React.FC = () => {
                 <option value="mature">Mature vegetation (stricter)</option>
                 <option value="young">Young vegetation (sensitive)</option>
               </select>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <label style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '500' }}>
+                  Historical Months
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="24"
+                  value={historicalMonths}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val) && val >= 1 && val <= 24) {
+                      setHistoricalMonths(val);
+                    }
+                  }}
+                  style={{ 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '6px', 
+                    padding: '0.35rem 0.5rem', 
+                    minWidth: '100px',
+                    fontSize: '0.875rem'
+                  }}
+                  title="Number of months of historical data to fetch (1-24 months)"
+                />
+              </div>
               <select
                 value={styleId}
                 onChange={(e) => handleStyleChange(e.target.value)}

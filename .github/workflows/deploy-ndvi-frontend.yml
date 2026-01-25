@@ -34,6 +34,8 @@ jobs:
         run: |
           # Try npm ci first, fallback to npm install if lock file is out of sync
           npm ci || npm install
+          # Fix permissions for vite binary
+          chmod +x node_modules/.bin/*
 
       - name: Build application
         working-directory: ./ndvi-calculatorr/client
