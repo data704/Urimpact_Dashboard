@@ -36,7 +36,7 @@ const PlantingRecordsCertificates: React.FC = () => {
   const map = useRef<mapboxgl.Map | null>(null);
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [allTrees, setAllTrees] = useState<MajmaahTree[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [_dataLoading, setDataLoading] = useState(true);
   const [mapStyle, setMapStyle] = useState<string>(MAP_STYLES.satellite);
   const [currentMapStyle, setCurrentMapStyle] = useState<string>(MAP_STYLES.satellite);
   const [searchTerm, setSearchTerm] = useState('');

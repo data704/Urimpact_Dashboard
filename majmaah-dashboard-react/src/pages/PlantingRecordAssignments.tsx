@@ -77,7 +77,7 @@ const PlantingRecordAssignments: React.FC = () => {
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
-  const [creatingAnother, setCreatingAnother] = useState(false);
+  const [_creatingAnother, setCreatingAnother] = useState(false);
 
   useEffect(() => {
     fetchData();

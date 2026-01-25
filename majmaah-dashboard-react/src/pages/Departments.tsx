@@ -21,7 +21,7 @@ const Departments: React.FC = () => {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [formData, setFormData] = useState({ nameEnglish: '', nameArabic: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [_deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   useEffect(() => {
     fetchDepartments();

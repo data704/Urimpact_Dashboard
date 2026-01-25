@@ -54,7 +54,7 @@ const TreesCertificate: React.FC = () => {
             // Ensure we parse the carbon value correctly (it might be a number or string)
             const carbonValue = typeof analysis.carbonTonnes === 'number' 
               ? analysis.carbonTonnes 
-              : parseFloat(analysis.carbonTonnes) || 0;
+              : parseFloat(String(analysis.carbonTonnes || 0)) || 0;
             return sum + carbonValue;
           }, 0);
           
@@ -69,7 +69,7 @@ const TreesCertificate: React.FC = () => {
             analyses: analyses.map(a => {
               const carbonValue = typeof a.carbonTonnes === 'number' 
                 ? a.carbonTonnes 
-                : parseFloat(a.carbonTonnes) || 0;
+                : parseFloat(String(a.carbonTonnes || 0)) || 0;
               return {
                 name: a.displayName || 'Unknown',
                 id: a.analysisId || 0,
