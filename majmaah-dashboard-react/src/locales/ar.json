@@ -29,7 +29,7 @@
   "sidebar": {
     "dashboard": "لوحة التحكم",
     "contentManagement": "إدارة المحتوى",
-    "plantingRecordsCertificates": "شهادات سجلات الزراعة",
+    "plantingRecordsCertificates": "سجلات الزراعة",
     "departments": "الأقسام",
     "employees": "الموظفين",
     "plantingRecordAssignments": "تعيينات سجل الزراعة",
@@ -97,7 +97,7 @@
       "poor": "ضعيف"
     },
     "mapWidget": {
-      "title": "جامعة المجمعة – إمكانات زراعة الأشجار (أكتوبر 2025)",
+      "title": "جامعة المجمعة - تحليل زراعة الأشجار",
       "totalTrees": "إجمالي الأشجار",
       "liveGeeData": "بيانات GEE المباشرة",
       "demoData": "بيانات تجريبية",

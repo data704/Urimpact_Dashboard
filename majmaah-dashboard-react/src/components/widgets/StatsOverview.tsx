@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StatCard } from './StatCard';
-import { Sprout, Cloud, TrendingUp, Users } from 'lucide-react';
+import { Sprout, Cloud, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types';
 import { mockAdvancedClientStats, mockAdminStats } from '@/services/mockData';
@@ -9,23 +9,23 @@ import apiService from '@/services/api';
 import { config } from '@/config';
 import { StatDetailModal } from '@/components/StatDetailModal';
 
-export const StatsOverview: React.FC = () => {
+export const StatsOverview: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [stats, setStats] = useState(mockAdvancedClientStats);
   const [loading, setLoading] = useState(true);
   const [useRealData, setUseRealData] = useState(false);
-  const [selectedStat, setSelectedStat] = useState<'trees' | 'carbon' | 'survival' | 'communities' | null>(null);
+  const [selectedStat, setSelectedStat] = useState<'trees' | 'carbon' | 'survival' | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   useEffect(() => {
     fetchRealStats();
-  }, []);
+  }, [selectedAnalysisId]);
 
   const fetchRealStats = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getDashboardStats(config.app.projectId);
+      const response = await apiService.getDashboardStats(config.app.projectId, selectedAnalysisId);
       
       if (response.success && response.data) {
         const realStats = {
@@ -50,8 +50,8 @@ export const StatsOverview: React.FC = () => {
   
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {[1, 2, 3, 4].map(i => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+        {[1, 2, 3].map(i => (
           <div key={i} className="stat-card animate-pulse">
             <div className="h-4 bg-gray-200 rounded w-1/2 mb-3"></div>
             <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -62,7 +62,7 @@ export const StatsOverview: React.FC = () => {
     );
   }
   
-  const handleStatClick = async (statType: 'trees' | 'carbon' | 'survival' | 'communities') => {
+  const handleStatClick = async (statType: 'trees' | 'carbon' | 'survival') => {
     setSelectedStat(statType);
     setIsModalOpen(true);
   };
@@ -71,7 +71,7 @@ export const StatsOverview: React.FC = () => {
   if (user?.role === UserRole.ADVANCEDCLIENT) {
     return (
       <>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
           <StatCard
             label={t('dashboard.treesPlanted')}
             value={stats.treesPlanted.toLocaleString()}
@@ -101,16 +101,6 @@ export const StatsOverview: React.FC = () => {
             chartColor="#f59e0b"
             clickable={true}
             onClick={() => handleStatClick('survival')}
-          />
-          <StatCard
-            label={t('dashboard.communitiesSupported')}
-            value={stats.communitiesSupported}
-            description={t('dashboard.localJobs')}
-            descriptionIcon={<Users size={16} />}
-            chart={[1, 2, 3, 5, 6, 7, 8]}
-            chartColor="#13c5bc"
-            clickable={true}
-            onClick={() => handleStatClick('communities')}
           />
         </div>
 

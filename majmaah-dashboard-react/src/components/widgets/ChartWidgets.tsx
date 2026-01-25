@@ -23,7 +23,7 @@ import { config } from '@/config';
 const COLORS = ['#10b981', '#22c55e', '#3b82f6', '#f59e0b'];
 
 // Carbon Sequestration Chart
-export const CarbonSequestrationChart: React.FC = () => {
+export const CarbonSequestrationChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockCarbonSequestrationData);
   const [loading, setLoading] = useState(true);
@@ -31,7 +31,7 @@ export const CarbonSequestrationChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getCarbonTrends(config.app.projectId, 12);
+        const response = await apiService.getCarbonTrends(config.app.projectId, 12, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockCarbonSequestrationData);
           console.log('✅ Using real GEE data for carbon trends');
@@ -45,7 +45,7 @@ export const CarbonSequestrationChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (
@@ -72,7 +72,7 @@ export const CarbonSequestrationChart: React.FC = () => {
 };
 
 // Canopy Coverage Chart
-export const CanopyCoverageChart: React.FC = () => {
+export const CanopyCoverageChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockCanopyCoverageData);
   const [loading, setLoading] = useState(true);
@@ -80,7 +80,7 @@ export const CanopyCoverageChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getCanopyCoverage(config.app.projectId);
+        const response = await apiService.getCanopyCoverage(config.app.projectId, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockCanopyCoverageData);
           console.log('✅ Using real GEE data for canopy coverage');
@@ -94,7 +94,7 @@ export const CanopyCoverageChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (
@@ -122,7 +122,7 @@ export const CanopyCoverageChart: React.FC = () => {
 };
 
 // Species Richness Chart
-export const SpeciesRichnessChart: React.FC = () => {
+export const SpeciesRichnessChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockSpeciesRichnessData);
   const [loading, setLoading] = useState(true);
@@ -130,7 +130,7 @@ export const SpeciesRichnessChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getSpeciesRichness(config.app.projectId);
+        const response = await apiService.getSpeciesRichness(config.app.projectId, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockSpeciesRichnessData);
           console.log('✅ Using real GEE data for species richness');
@@ -144,7 +144,7 @@ export const SpeciesRichnessChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (
@@ -171,7 +171,7 @@ export const SpeciesRichnessChart: React.FC = () => {
 };
 
 // Ecosystem Services Chart
-export const EcosystemServicesChart: React.FC = () => {
+export const EcosystemServicesChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockEcosystemServicesData);
   const [loading, setLoading] = useState(true);
@@ -179,7 +179,7 @@ export const EcosystemServicesChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getEcosystemServices(config.app.projectId);
+        const response = await apiService.getEcosystemServices(config.app.projectId, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockEcosystemServicesData);
           console.log('✅ Using real GEE data for ecosystem services');
@@ -193,7 +193,7 @@ export const EcosystemServicesChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (
@@ -219,7 +219,7 @@ export const EcosystemServicesChart: React.FC = () => {
 };
 
 // Vegetation Health Chart
-export const VegetationHealthChart: React.FC = () => {
+export const VegetationHealthChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockVegetationHealthData);
   const [loading, setLoading] = useState(true);
@@ -227,7 +227,7 @@ export const VegetationHealthChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getVegetationHealth(config.app.projectId);
+        const response = await apiService.getVegetationHealth(config.app.projectId, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockVegetationHealthData);
           console.log('✅ Using real GEE data for vegetation health');
@@ -241,7 +241,7 @@ export const VegetationHealthChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (
@@ -269,7 +269,7 @@ export const VegetationHealthChart: React.FC = () => {
 };
 
 // Survival Rate Chart
-export const SurvivalRateChart: React.FC = () => {
+export const SurvivalRateChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockSurvivalRateData);
   const [loading, setLoading] = useState(true);
@@ -277,7 +277,7 @@ export const SurvivalRateChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getSurvivalRate(config.app.projectId);
+        const response = await apiService.getSurvivalRate(config.app.projectId, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockSurvivalRateData);
           console.log('✅ Using real GEE data for survival rate');
@@ -291,7 +291,7 @@ export const SurvivalRateChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (
@@ -318,7 +318,7 @@ export const SurvivalRateChart: React.FC = () => {
 };
 
 // Growth & Carbon Impact Chart
-export const GrowthCarbonImpactChart: React.FC = () => {
+export const GrowthCarbonImpactChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockGrowthCarbonImpactData);
   const [loading, setLoading] = useState(true);
@@ -326,7 +326,7 @@ export const GrowthCarbonImpactChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getGrowthCarbonImpact(config.app.projectId, 12);
+        const response = await apiService.getGrowthCarbonImpact(config.app.projectId, 12, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockGrowthCarbonImpactData);
           console.log('✅ Using real GEE data for growth & carbon impact');
@@ -340,7 +340,7 @@ export const GrowthCarbonImpactChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (
@@ -393,7 +393,7 @@ export const PlantingRecordsChart: React.FC = () => {
 };
 
 // NDVI Trends Chart (replacing Species Distribution)
-export const NDVITrendsChart: React.FC = () => {
+export const NDVITrendsChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockNDVITrendsData);
   const [loading, setLoading] = useState(true);
@@ -401,7 +401,7 @@ export const NDVITrendsChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getNDVITrends(config.app.projectId, 12);
+        const response = await apiService.getNDVITrends(config.app.projectId, 12, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockNDVITrendsData);
           console.log('✅ Using real GEE data for NDVI trends');
@@ -415,7 +415,7 @@ export const NDVITrendsChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (
@@ -452,7 +452,7 @@ export const NDVITrendsChart: React.FC = () => {
 };
 
 // EVI Trends Chart (replacing Ecosystem Services Impact)
-export const EVITrendsChart: React.FC = () => {
+export const EVITrendsChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockEVITrendsData);
   const [loading, setLoading] = useState(true);
@@ -460,7 +460,7 @@ export const EVITrendsChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getEVITrends(config.app.projectId, 12);
+        const response = await apiService.getEVITrends(config.app.projectId, 12, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockEVITrendsData);
           console.log('✅ Using real GEE data for EVI trends');
@@ -474,7 +474,7 @@ export const EVITrendsChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (
@@ -511,7 +511,7 @@ export const EVITrendsChart: React.FC = () => {
 };
 
 // Vegetation Health Index Chart (replacing Planting Records Overview)
-export const VegetationHealthIndexChart: React.FC = () => {
+export const VegetationHealthIndexChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockVegetationHealthIndexData);
   const [loading, setLoading] = useState(true);
@@ -519,7 +519,7 @@ export const VegetationHealthIndexChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getVegetationHealthIndex(config.app.projectId);
+        const response = await apiService.getVegetationHealthIndex(config.app.projectId, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockVegetationHealthIndexData);
           console.log('✅ Using real GEE data for vegetation health index');
@@ -533,7 +533,7 @@ export const VegetationHealthIndexChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (
@@ -584,7 +584,7 @@ export const VegetationHealthIndexChart: React.FC = () => {
 };
 
 // Above Ground Carbon (AGC) Trends Chart
-export const AGCTrendsChart: React.FC = () => {
+export const AGCTrendsChart: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const [data, setData] = useState(mockAGCTrendsData);
   const [loading, setLoading] = useState(true);
@@ -592,7 +592,7 @@ export const AGCTrendsChart: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await apiService.getAGCTrends(config.app.projectId, 12);
+        const response = await apiService.getAGCTrends(config.app.projectId, 12, selectedAnalysisId);
         if (response.success && Array.isArray(response.data) && response.data.length > 0) {
           setData(response.data as typeof mockAGCTrendsData);
           console.log('✅ Using real GEE data for AGC trends');
@@ -606,7 +606,7 @@ export const AGCTrendsChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedAnalysisId]);
 
   if (loading) {
     return (

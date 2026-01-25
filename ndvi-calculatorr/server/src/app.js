@@ -10,6 +10,10 @@ import socRoutes from './routes/socRoutes.js';
 import baselineRoutes from './routes/baselineRoutes.js';
 import majmaahRoutes from './routes/majmaahRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import departmentRoutes from './routes/departmentRoutes.js';
+import employeeRoutes from './routes/employeeRoutes.js';
+import plantingRecordAssignmentRoutes from './routes/plantingRecordAssignmentRoutes.js';
+import certificationHistoryRoutes from './routes/certificationHistoryRoutes.js';
 import { initEarthEngine } from './services/earthEngineService.js';
 import { testConnection, initializeDatabase } from './config/database.js';
 import { initializeSecrets } from './config/secrets.js';
@@ -78,9 +82,11 @@ app.use(
 );
 
 // Rate limiting - AFTER CORS to allow OPTIONS preflight requests
+// More lenient limits for development, stricter for production
+const isDevelopment = process.env.NODE_ENV === 'development';
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: isDevelopment ? 1000 : 100, // 1000 requests in dev, 100 in production
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -88,6 +94,9 @@ const limiter = rateLimit({
     // Skip rate limiting for OPTIONS preflight requests
     return req.method === 'OPTIONS';
   },
+  // Use memory store for development (faster, but resets on server restart)
+  // Production should use Redis store for distributed systems
+  store: isDevelopment ? undefined : undefined, // Default in-memory store
 });
 app.use('/api', limiter);
 
@@ -121,6 +130,10 @@ app.use('/api', socRoutes);
 app.use('/api', baselineRoutes);
 app.use('/api', majmaahRoutes);
 app.use('/api', userRoutes);
+app.use('/api', departmentRoutes);
+app.use('/api', employeeRoutes);
+app.use('/api', plantingRecordAssignmentRoutes);
+app.use('/api', certificationHistoryRoutes);
 
 // 404 handler (must be after all routes)
 app.use(notFoundHandler);

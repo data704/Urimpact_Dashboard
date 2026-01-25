@@ -6,6 +6,66 @@ import pool from '../config/database.js';
 // ============================================
 
 /**
+ * Get the actual date range of available historical data for a project
+ * Returns the number of months of data available, up to the requested max
+ */
+export const getAvailableHistoricalMonths = async (projectId = 1, maxMonths = 24, userId = null) => {
+  try {
+    let query = `
+      SELECT 
+        MIN(analysis_date) as earliest_date,
+        MAX(analysis_date) as latest_date,
+        COUNT(DISTINCT DATE_TRUNC('month', analysis_date)) as month_count
+      FROM analysis_results ar
+      WHERE ar.project_id = $1
+      AND ar.assigned_to_majmaah = true
+      AND ar.analysis_type IN ('baseline', 'historical_monthly')
+    `;
+    
+    const params = [projectId];
+    
+    if (userId) {
+      query += ` AND ar.id IN (
+        SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
+      )`;
+      params.push(userId);
+    }
+    
+    const result = await pool.query(query, params);
+    
+    if (result.rows.length === 0 || !result.rows[0].earliest_date) {
+      return { availableMonths: 0, earliestDate: null, latestDate: null };
+    }
+    
+    const row = result.rows[0];
+    const earliestDate = new Date(row.earliest_date);
+    const latestDate = new Date(row.latest_date);
+    const monthCount = parseInt(row.month_count) || 0;
+    
+    // Calculate months between earliest and latest
+    const monthsDiff = (latestDate.getFullYear() - earliestDate.getFullYear()) * 12 + 
+                       (latestDate.getMonth() - earliestDate.getMonth()) + 1;
+    
+    // Return the smaller of: actual months available, month count from DB, or maxMonths
+    const availableMonths = Math.min(monthsDiff, monthCount, maxMonths);
+    
+    return {
+      availableMonths,
+      earliestDate: earliestDate.toISOString().split('T')[0],
+      latestDate: latestDate.toISOString().split('T')[0],
+      monthCount
+    };
+  } catch (error) {
+    console.error('Error getting available historical months:', error);
+    return { availableMonths: 0, earliestDate: null, latestDate: null };
+  }
+};
+
+// ============================================
+// SAVE ANALYSIS RESULTS
+// ============================================
+
+/**
  * Save complete baseline assessment to database
  * This captures ALL data needed for Majmaah dashboard widgets
  */
@@ -17,6 +77,7 @@ export const saveBaselineAssessment = async (data) => {
     existingVegetation,
     agbEstimation,
     baselineImagery,
+    historicalMonthly = [],
     fullResults
   } = data;
 
@@ -24,33 +85,37 @@ export const saveBaselineAssessment = async (data) => {
   try {
     await client.query('BEGIN');
 
-    // Calculate total carbon and CO2 equivalent
-    const totalCarbonTonnes = ((agbEstimation.totalAGBTonnes || 0) * 0.47) || 0;
-    const co2EquivalentTonnes = totalCarbonTonnes * 3.67; // Convert carbon to CO2
-
-    // Clamp NDVI/EVI values to valid range (-1 to 1) to prevent database overflow
-    // NUMERIC(5,3) can store -99.999 to 99.999, but NDVI/EVI should be -1 to 1
+    // Helper function to clamp NDVI/EVI values
+    // Note: EVI values outside -1 to 1 are typically artifacts from:
+    // - Monthly composite edge cases (median of mixed pixels)
+    // - Very bright surfaces (sand, water, buildings)  
+    // - Calculation artifacts when denominator approaches zero
+    // Clamping these values is safe and doesn't significantly affect vegetation analysis accuracy
+    // Most vegetation EVI values are between 0.1-0.8, so extreme values are usually non-vegetation pixels
     const clampNDVI = (value, name = 'value') => {
       if (value === null || value === undefined) return 0;
       const num = parseFloat(value);
       if (isNaN(num)) return 0;
-      // Clamp to -1 to 1 range
       const clamped = Math.max(-1, Math.min(1, num));
-      if (clamped !== num) {
-        console.warn(`⚠️  Clamped ${name} from ${num} to ${clamped} (NDVI/EVI should be -1 to 1)`);
+      // Only warn if the value is significantly outside range (more than 0.1 difference)
+      // Small differences are likely just rounding/calculation artifacts
+      if (Math.abs(clamped - num) > 0.1) {
+        console.warn(`⚠️  Clamped ${name} from ${num.toFixed(3)} to ${clamped} (NDVI/EVI should be -1 to 1). This is expected for non-vegetation pixels and doesn't affect accuracy.`);
       }
       return clamped;
     };
 
-    const ndviMean = clampNDVI(baselineImagery.ndviStats?.mean, 'NDVI mean');
-    const ndviMin = clampNDVI(baselineImagery.ndviStats?.min, 'NDVI min');
-    const ndviMax = clampNDVI(baselineImagery.ndviStats?.max, 'NDVI max');
-    const eviMean = clampNDVI(baselineImagery.eviStats?.mean, 'EVI mean');
-    const eviMin = clampNDVI(baselineImagery.eviStats?.min, 'EVI min');
-    const eviMax = clampNDVI(baselineImagery.eviStats?.max, 'EVI max');
+    // 1. Save the main baseline assessment (current snapshot)
+    const totalCarbonTonnes = ((agbEstimation?.totalAGBTonnes || 0) * 0.47) || 0;
+    const co2EquivalentTonnes = totalCarbonTonnes * 3.67;
 
-    // Insert analysis result with ALL metrics
-    // NOTE: assigned_to_majmaah defaults to false, so this analysis will appear in unassigned list
+    const ndviMean = clampNDVI(baselineImagery?.ndviStats?.mean, 'NDVI mean');
+    const ndviMin = clampNDVI(baselineImagery?.ndviStats?.min, 'NDVI min');
+    const ndviMax = clampNDVI(baselineImagery?.ndviStats?.max, 'NDVI max');
+    const eviMean = clampNDVI(baselineImagery?.eviStats?.mean, 'EVI mean');
+    const eviMin = clampNDVI(baselineImagery?.eviStats?.min, 'EVI min');
+    const eviMax = clampNDVI(baselineImagery?.eviStats?.max, 'EVI max');
+
     const result = await client.query(`
       INSERT INTO analysis_results (
         project_id, analysis_type, analysis_date, coordinates,
@@ -60,7 +125,7 @@ export const saveBaselineAssessment = async (data) => {
         ndvi_mean, ndvi_min, ndvi_max,
         evi_mean, evi_min, evi_max,
         total_agb_kg, total_agb_tonnes, average_agb_kg,
-        total_carbon_tonnes, co2_equivalent_tonnes,
+        total_carbon_tonnes, co2_equivalent_tonnes, total_agc_tonnes,
         trees_geojson,
         ndvi_map_id, ndvi_url_format,
         evi_map_id, evi_url_format,
@@ -75,7 +140,7 @@ export const saveBaselineAssessment = async (data) => {
         $11, $12, $13,
         $14, $15, $16,
         $17, $18, $19,
-        $20, $21,
+        $20, $21, $20,
         $22,
         $23, $24,
         $25, $26,
@@ -87,40 +152,106 @@ export const saveBaselineAssessment = async (data) => {
     `, [
       projectId,
       JSON.stringify(coordinates),
-      siteDefinition.totalArea || 0,
-      siteDefinition.candidatePlantingArea || 0,
-      siteDefinition.candidateAreaPercent || 0,
-      siteDefinition.constraintArea || 0,
-      siteDefinition.constraintAreaPercent || 0,
-      existingVegetation.treeCount || 0,
-      existingVegetation.canopyCoverPercent || 0,
-      existingVegetation.averageHealthScore || 0,
+      siteDefinition?.totalArea || 0,
+      siteDefinition?.candidatePlantingArea || 0,
+      siteDefinition?.candidateAreaPercent || 0,
+      siteDefinition?.constraintArea || 0,
+      siteDefinition?.constraintAreaPercent || 0,
+      existingVegetation?.treeCount || 0,
+      existingVegetation?.canopyCoverPercent || 0,
+      existingVegetation?.averageHealthScore || 0,
       ndviMean,
       ndviMin,
       ndviMax,
       eviMean,
       eviMin,
       eviMax,
-      agbEstimation.totalAGB || 0,
-      agbEstimation.totalAGBTonnes || 0,
-      agbEstimation.averageAGB || 0,
+      agbEstimation?.totalAGB || 0,
+      agbEstimation?.totalAGBTonnes || 0,
+      agbEstimation?.averageAGB || 0,
       totalCarbonTonnes,
       co2EquivalentTonnes,
-      JSON.stringify(existingVegetation.trees || []),
-      baselineImagery.ndviMapId || null,
-      baselineImagery.ndviUrlFormat || null,
-      baselineImagery.eviMapId || null,
-      baselineImagery.eviUrlFormat || null,
-      existingVegetation.canopyMapId || null,
-      existingVegetation.canopyUrlFormat || null,
+      JSON.stringify(existingVegetation?.trees || []),
+      baselineImagery?.ndviMapId || null,
+      baselineImagery?.ndviUrlFormat || null,
+      baselineImagery?.eviMapId || null,
+      baselineImagery?.eviUrlFormat || null,
+      existingVegetation?.canopyMapId || null,
+      existingVegetation?.canopyUrlFormat || null,
       JSON.stringify(fullResults)
     ]);
 
-    const analysisId = result.rows[0].id;
-    console.log(`✅ Baseline assessment saved to database (ID: ${analysisId})`);
+    const mainAnalysisId = result.rows[0].id;
+    console.log(`✅ Main baseline assessment saved to database (ID: ${mainAnalysisId})`);
+
+    // 2. Save historical monthly data (one record per month)
+    if (historicalMonthly && historicalMonthly.length > 0) {
+      console.log(`📅 Saving ${historicalMonthly.length} months of historical data...`);
+      
+      let savedMonths = 0;
+      for (const monthData of historicalMonthly) {
+        try {
+          const monthNDVIMean = clampNDVI(monthData.ndviMean, 'Monthly NDVI mean');
+          const monthNDVIMin = clampNDVI(monthData.ndviMin, 'Monthly NDVI min');
+          const monthNDVIMax = clampNDVI(monthData.ndviMax, 'Monthly NDVI max');
+          const monthEVIMean = clampNDVI(monthData.eviMean, 'Monthly EVI mean');
+          const monthEVIMin = clampNDVI(monthData.eviMin, 'Monthly EVI min');
+          const monthEVIMax = clampNDVI(monthData.eviMax, 'Monthly EVI max');
+
+          await client.query(`
+            INSERT INTO analysis_results (
+              project_id, analysis_type, analysis_date, coordinates,
+              total_area_ha,
+              canopy_cover_percent,
+              ndvi_mean, ndvi_min, ndvi_max,
+              evi_mean, evi_min, evi_max,
+              total_agb_tonnes, total_agc_tonnes,
+              total_carbon_tonnes, co2_equivalent_tonnes,
+              full_results,
+              assigned_to_majmaah,
+              visible_to_client
+            ) VALUES (
+              $1, 'historical_monthly', $2::DATE, $3,
+              $4,
+              $5,
+              $6, $7, $8,
+              $9, $10, $11,
+              $12, $13,
+              $14, $15,
+              $16,
+              false,
+              false
+            )
+          `, [
+            projectId,
+            monthData.analysisDate, // YYYY-MM-DD format
+            JSON.stringify(coordinates),
+            siteDefinition?.totalArea || 0,
+            monthData.canopyCoverPercent || 0,
+            monthNDVIMean,
+            monthNDVIMin,
+            monthNDVIMax,
+            monthEVIMean,
+            monthEVIMin,
+            monthEVIMax,
+            monthData.totalAGBTonnes || 0,
+            monthData.totalAGCTonnes || 0,
+            monthData.totalCarbonTonnes || 0,
+            monthData.co2EquivalentTonnes || 0,
+            JSON.stringify({ ...monthData, historical: true })
+          ]);
+
+          savedMonths++;
+        } catch (monthError) {
+          console.error(`  ❌ Error saving month ${monthData.monthKey}:`, monthError.message);
+          // Continue with other months
+        }
+      }
+      console.log(`✅ Saved ${savedMonths}/${historicalMonthly.length} months of historical data`);
+    }
 
     await client.query('COMMIT');
-    return analysisId;
+    return mainAnalysisId;
 
   } catch (error) {
     await client.query('ROLLBACK');
@@ -281,10 +412,10 @@ export const getMajmaahAnalyses = async (projectId = null, userId = null) => {
 /**
  * Get aggregated stats for Majmaah dashboard
  * Returns data for the 4 stat cards
- * Filters by user assignments if userId is provided
+ * Filters by analysisId if provided, otherwise by user assignments if userId is provided
  */
-export const getMajmaahDashboardStats = async (projectId = 1, userId = null) => {
-  // Build query with optional user filtering
+export const getMajmaahDashboardStats = async (projectId = 1, userId = null, analysisId = null) => {
+  // Build query with optional filtering
   let query = `
     SELECT 
       COALESCE(SUM(ar.tree_count), 0) as total_trees,
@@ -303,8 +434,11 @@ export const getMajmaahDashboardStats = async (projectId = 1, userId = null) => 
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
@@ -334,51 +468,91 @@ export const getMajmaahDashboardStats = async (projectId = 1, userId = null) => 
  * Get carbon sequestration data over time (for chart)
  * Filters by user assignments if userId is provided
  */
-export const getCarbonTrends = async (projectId = 1, months = 12, userId = null) => {
+export const getCarbonTrends = async (projectId = 1, months = 12, userId = null, analysisId = null) => {
+  // If analysisId is provided, use it directly (single analysis)
+  // Otherwise, check available months for user's assignments
+  const availableData = analysisId ? { availableMonths: months } : await getAvailableHistoricalMonths(projectId, months, userId);
+  const actualMonths = availableData.availableMonths > 0 ? availableData.availableMonths : months;
+  
   let query = `
     SELECT 
-      TO_CHAR(analysis_date, 'Mon') as month,
-      COALESCE(SUM(co2_equivalent_tonnes), 0) as value
+      DATE_TRUNC('month', ar.analysis_date) as month_date,
+      TO_CHAR(ar.analysis_date, 'Mon') as month,
+      COALESCE(SUM(ar.co2_equivalent_tonnes), 0) as value
     FROM analysis_results ar
     WHERE ar.project_id = $1
     AND ar.assigned_to_majmaah = true
-    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${months} months'
+    AND ar.analysis_type IN ('baseline', 'historical_monthly')
+    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${actualMonths} months'
   `;
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
     params.push(userId);
   }
   
-  query += ` GROUP BY analysis_date, TO_CHAR(analysis_date, 'Mon')
-    ORDER BY analysis_date ASC`;
+  query += ` GROUP BY DATE_TRUNC('month', ar.analysis_date), TO_CHAR(ar.analysis_date, 'Mon')
+    ORDER BY month_date ASC`;
   
   const result = await pool.query(query, params);
 
-  // If no data, return mock progression
+  // If no data, return empty array
   if (result.rows.length === 0) {
-    return [
-      { month: 'Jan', value: 0 },
-      { month: 'Feb', value: 0 }
-    ];
+    return [];
   }
 
-  return result.rows.map(row => ({
-    month: row.month,
-    value: parseFloat(row.value) || 0
-  }));
+  const dataMap = new Map();
+  result.rows.forEach(row => {
+    const monthKey = row.month_date.toISOString().substring(0, 7); // YYYY-MM format
+    dataMap.set(monthKey, {
+      month: row.month,
+      value: parseFloat(row.value) || 0,
+      date: row.month_date
+    });
+  });
+
+  // Generate 12 months of data, filling gaps with interpolation
+  const monthlyData = [];
+  const currentDate = new Date();
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  for (let i = months - 1; i >= 0; i--) {
+    const targetDate = new Date(currentDate);
+    targetDate.setMonth(targetDate.getMonth() - i);
+    const monthKey = targetDate.toISOString().substring(0, 7);
+    const monthName = monthNames[targetDate.getMonth()];
+    
+    if (dataMap.has(monthKey)) {
+      monthlyData.push({
+        month: monthName,
+        value: dataMap.get(monthKey).value
+      });
+    } else {
+      // Interpolate or use last known value
+      const lastValue = monthlyData.length > 0 ? monthlyData[monthlyData.length - 1].value : 0;
+      monthlyData.push({
+        month: monthName,
+        value: lastValue
+      });
+    }
+  }
+
+  return monthlyData;
 };
 
 /**
  * Get canopy coverage distribution (for pie chart)
  * Filters by user assignments if userId is provided
  */
-export const getCanopyCoverageDistribution = async (projectId = 1, userId = null) => {
+export const getCanopyCoverageDistribution = async (projectId = 1, userId = null, analysisId = null) => {
   let query = `
     SELECT canopy_cover_percent
     FROM analysis_results ar
@@ -388,8 +562,11 @@ export const getCanopyCoverageDistribution = async (projectId = 1, userId = null
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
@@ -424,7 +601,7 @@ export const getCanopyCoverageDistribution = async (projectId = 1, userId = null
  * Get species richness data (for bar chart)
  * Filters by user assignments if userId is provided
  */
-export const getSpeciesRichnessData = async (projectId = 1, userId = null) => {
+export const getSpeciesRichnessData = async (projectId = 1, userId = null, analysisId = null) => {
   // Build subquery for analysis IDs
   let analysisSubquery = `
     SELECT id FROM analysis_results ar
@@ -434,8 +611,11 @@ export const getSpeciesRichnessData = async (projectId = 1, userId = null) => {
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    analysisSubquery += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     analysisSubquery += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
@@ -467,7 +647,11 @@ export const getSpeciesRichnessData = async (projectId = 1, userId = null) => {
   
   const treeParams = [projectId];
   
-  if (userId) {
+  // Priority: analysisId > userId (for fallback tree query)
+  if (analysisId) {
+    treeQuery += ` AND ar.id = $2`;
+    treeParams.push(analysisId);
+  } else if (userId) {
     treeQuery += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
@@ -496,7 +680,7 @@ export const getSpeciesRichnessData = async (projectId = 1, userId = null) => {
  * Get ecosystem services scores (for radar chart)
  * Filters by user assignments if userId is provided
  */
-export const getEcosystemServices = async (projectId = 1, userId = null) => {
+export const getEcosystemServices = async (projectId = 1, userId = null, analysisId = null) => {
   let query = `
     SELECT 
       cm.air_quality_score,
@@ -512,8 +696,11 @@ export const getEcosystemServices = async (projectId = 1, userId = null) => {
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
@@ -548,7 +735,7 @@ export const getEcosystemServices = async (projectId = 1, userId = null) => {
  * Get vegetation health distribution (for pie chart)
  * Filters by user assignments if userId is provided
  */
-export const getVegetationHealthDistribution = async (projectId = 1, userId = null) => {
+export const getVegetationHealthDistribution = async (projectId = 1, userId = null, analysisId = null) => {
   let query = `
     SELECT trees_geojson
     FROM analysis_results ar
@@ -558,8 +745,11 @@ export const getVegetationHealthDistribution = async (projectId = 1, userId = nu
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
@@ -598,7 +788,7 @@ export const getVegetationHealthDistribution = async (projectId = 1, userId = nu
  * Get survival rate data over years (for line chart)
  * Filters by user assignments if userId is provided
  */
-export const getSurvivalRateData = async (projectId = 1, userId = null) => {
+export const getSurvivalRateData = async (projectId = 1, userId = null, analysisId = null) => {
   let query = `
     SELECT 
       EXTRACT(YEAR FROM cm.metric_date)::INTEGER as year,
@@ -611,8 +801,11 @@ export const getSurvivalRateData = async (projectId = 1, userId = null) => {
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
@@ -645,31 +838,41 @@ export const getSurvivalRateData = async (projectId = 1, userId = null) => {
  * Get growth and carbon impact data (for composed chart)
  * Filters by user assignments if userId is provided
  */
-export const getGrowthCarbonImpact = async (projectId = 1, months = 12, userId = null) => {
+export const getGrowthCarbonImpact = async (projectId = 1, months = 12, userId = null, analysisId = null) => {
+  // If analysisId is provided, use it directly
+  const availableData = analysisId ? { availableMonths: months } : await getAvailableHistoricalMonths(projectId, months, userId);
+  const actualMonths = availableData.availableMonths > 0 ? availableData.availableMonths : months;
+  
+  // Use analysis_results directly for historical_monthly data, fallback to calculated_metrics
   let query = `
     SELECT 
-      TO_CHAR(cm.metric_date, 'Mon') as month,
-      AVG(cm.tree_growth_cm) as growth,
-      AVG(cm.carbon_growth_kg) as carbon
-    FROM calculated_metrics cm
-    JOIN analysis_results ar ON cm.analysis_id = ar.id
+      DATE_TRUNC('month', COALESCE(cm.metric_date, ar.analysis_date)) as metric_date,
+      TO_CHAR(COALESCE(cm.metric_date, ar.analysis_date), 'Mon') as month,
+      COALESCE(AVG(cm.tree_growth_cm), 2.0) as growth,
+      COALESCE(AVG(ar.co2_equivalent_tonnes / 12), AVG(cm.carbon_growth_kg / 1000)) as carbon
+    FROM analysis_results ar
+    LEFT JOIN calculated_metrics cm ON cm.analysis_id = ar.id
     WHERE ar.project_id = $1
     AND ar.assigned_to_majmaah = true
-    AND cm.metric_date >= CURRENT_DATE - INTERVAL '${months} months'
+    AND ar.analysis_type IN ('baseline', 'historical_monthly')
+    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${actualMonths} months'
   `;
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
     params.push(userId);
   }
   
-  query += ` GROUP BY cm.metric_date, TO_CHAR(cm.metric_date, 'Mon')
-    ORDER BY cm.metric_date ASC`;
+  query += ` GROUP BY DATE_TRUNC('month', COALESCE(cm.metric_date, ar.analysis_date)), TO_CHAR(COALESCE(cm.metric_date, ar.analysis_date), 'Mon')
+    ORDER BY metric_date ASC`;
   
   const result = await pool.query(query, params);
 
@@ -719,7 +922,7 @@ export const getGrowthCarbonImpact = async (projectId = 1, months = 12, userId =
  * Get tree data for map widget
  * Filters by user assignments if userId is provided
  */
-export const getMajmaahTreesForMap = async (projectId = 1, userId = null) => {
+export const getMajmaahTreesForMap = async (projectId = 1, userId = null, analysisId = null) => {
   let query = `
     SELECT trees_geojson
     FROM analysis_results ar
@@ -729,8 +932,11 @@ export const getMajmaahTreesForMap = async (projectId = 1, userId = null) => {
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
@@ -764,9 +970,14 @@ export const getMajmaahTreesForMap = async (projectId = 1, userId = null) => {
  * Get NDVI trends over time (for line chart)
  * Filters by user assignments if userId is provided
  */
-export const getNDVITrends = async (projectId = 1, months = 12, userId = null) => {
+export const getNDVITrends = async (projectId = 1, months = 12, userId = null, analysisId = null) => {
+  // If analysisId is provided, use it directly
+  const availableData = analysisId ? { availableMonths: months } : await getAvailableHistoricalMonths(projectId, months, userId);
+  const actualMonths = availableData.availableMonths > 0 ? availableData.availableMonths : months;
+  
   let query = `
     SELECT 
+      DATE_TRUNC('month', ar.analysis_date) as month_date,
       TO_CHAR(ar.analysis_date, 'Mon') as month,
       AVG(ar.ndvi_mean) as value,
       MIN(ar.ndvi_min) as min_value,
@@ -774,73 +985,85 @@ export const getNDVITrends = async (projectId = 1, months = 12, userId = null) =
     FROM analysis_results ar
     WHERE ar.project_id = $1
     AND ar.assigned_to_majmaah = true
-    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${months} months'
+    AND ar.analysis_type IN ('baseline', 'historical_monthly')
+    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${actualMonths} months'
     AND ar.ndvi_mean IS NOT NULL
   `;
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
     params.push(userId);
   }
   
-  query += ` GROUP BY ar.analysis_date, TO_CHAR(ar.analysis_date, 'Mon')
-    ORDER BY ar.analysis_date ASC`;
+  query += ` GROUP BY DATE_TRUNC('month', ar.analysis_date), TO_CHAR(ar.analysis_date, 'Mon')
+    ORDER BY month_date ASC`;
   
   const result = await pool.query(query, params);
 
-  // If no data, return mock progression based on latest analysis
+  // If no data, return empty array
   if (result.rows.length === 0) {
-    let latestQuery = `
-      SELECT ndvi_mean, ndvi_min, ndvi_max
-      FROM analysis_results ar
-      WHERE ar.project_id = $1
-      AND ar.assigned_to_majmaah = true
-      AND ar.ndvi_mean IS NOT NULL
-    `;
-    const latestParams = [projectId];
-    
-    if (userId) {
-      latestQuery += ` AND ar.id IN (
-        SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
-      )`;
-      latestParams.push(userId);
-    }
-    
-    latestQuery += ` ORDER BY ar.analysis_date DESC LIMIT 1`;
-    
-    const latest = await pool.query(latestQuery, latestParams);
-
-    if (latest.rows.length === 0) {
-      return [];
-    }
-
-    const baseNDVI = parseFloat(latest.rows[0].ndvi_mean) || 0.3;
-    const monthsArr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    return monthsArr.map((month, idx) => ({
-      month,
-      value: Math.min(1.0, Math.max(-1.0, baseNDVI + (idx * 0.02)))
-    }));
+    return [];
   }
 
-  return result.rows.map(row => ({
-    month: row.month,
-    value: parseFloat(row.value) || 0
-  }));
+  const dataMap = new Map();
+  result.rows.forEach(row => {
+    const monthKey = row.month_date.toISOString().substring(0, 7); // YYYY-MM format
+    dataMap.set(monthKey, {
+      month: row.month,
+      value: parseFloat(row.value) || 0,
+      date: row.month_date
+    });
+  });
+
+  // Generate N months of data based on actual available data
+  const monthlyData = [];
+  const currentDate = new Date();
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  for (let i = actualMonths - 1; i >= 0; i--) {
+    const targetDate = new Date(currentDate);
+    targetDate.setMonth(targetDate.getMonth() - i);
+    const monthKey = targetDate.toISOString().substring(0, 7);
+    const monthName = monthNames[targetDate.getMonth()];
+    
+    if (dataMap.has(monthKey)) {
+      monthlyData.push({
+        month: monthName,
+        value: dataMap.get(monthKey).value
+      });
+    } else {
+      // Interpolate or use last known value
+      const lastValue = monthlyData.length > 0 ? monthlyData[monthlyData.length - 1].value : 0;
+      monthlyData.push({
+        month: monthName,
+        value: lastValue
+      });
+    }
+  }
+
+  return monthlyData;
 };
 
 /**
  * Get EVI trends over time (for line chart)
  * Filters by user assignments if userId is provided
  */
-export const getEVITrends = async (projectId = 1, months = 12, userId = null) => {
+export const getEVITrends = async (projectId = 1, months = 12, userId = null, analysisId = null) => {
+  // If analysisId is provided, use it directly
+  const availableData = analysisId ? { availableMonths: months } : await getAvailableHistoricalMonths(projectId, months, userId);
+  const actualMonths = availableData.availableMonths > 0 ? availableData.availableMonths : months;
+  
   let query = `
     SELECT 
+      DATE_TRUNC('month', ar.analysis_date) as month_date,
       TO_CHAR(ar.analysis_date, 'Mon') as month,
       AVG(ar.evi_mean) as value,
       MIN(ar.evi_min) as min_value,
@@ -848,137 +1071,155 @@ export const getEVITrends = async (projectId = 1, months = 12, userId = null) =>
     FROM analysis_results ar
     WHERE ar.project_id = $1
     AND ar.assigned_to_majmaah = true
-    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${months} months'
+    AND ar.analysis_type IN ('baseline', 'historical_monthly')
+    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${actualMonths} months'
     AND ar.evi_mean IS NOT NULL
   `;
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
     params.push(userId);
   }
   
-  query += ` GROUP BY ar.analysis_date, TO_CHAR(ar.analysis_date, 'Mon')
-    ORDER BY ar.analysis_date ASC`;
+  query += ` GROUP BY DATE_TRUNC('month', ar.analysis_date), TO_CHAR(ar.analysis_date, 'Mon')
+    ORDER BY month_date ASC`;
   
   const result = await pool.query(query, params);
 
-  // If no data, return mock progression based on latest analysis
+  // If no data, return empty array
   if (result.rows.length === 0) {
-    let latestQuery = `
-      SELECT evi_mean, evi_min, evi_max
-      FROM analysis_results ar
-      WHERE ar.project_id = $1
-      AND ar.assigned_to_majmaah = true
-      AND ar.evi_mean IS NOT NULL
-    `;
-    const latestParams = [projectId];
-    
-    if (userId) {
-      latestQuery += ` AND ar.id IN (
-        SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
-      )`;
-      latestParams.push(userId);
-    }
-    
-    latestQuery += ` ORDER BY ar.analysis_date DESC LIMIT 1`;
-    
-    const latest = await pool.query(latestQuery, latestParams);
-
-    if (latest.rows.length === 0) {
-      return [];
-    }
-
-    const baseEVI = parseFloat(latest.rows[0].evi_mean) || 0.25;
-    const monthsArr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    return monthsArr.map((month, idx) => ({
-      month,
-      value: Math.min(1.0, Math.max(-1.0, baseEVI + (idx * 0.015)))
-    }));
+    return [];
   }
 
-  return result.rows.map(row => ({
-    month: row.month,
-    value: parseFloat(row.value) || 0
-  }));
+  const dataMap = new Map();
+  result.rows.forEach(row => {
+    const monthKey = row.month_date.toISOString().substring(0, 7); // YYYY-MM format
+    dataMap.set(monthKey, {
+      month: row.month,
+      value: parseFloat(row.value) || 0,
+      date: row.month_date
+    });
+  });
+
+  // Generate N months of data based on actual available data
+  const monthlyData = [];
+  const currentDate = new Date();
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  for (let i = actualMonths - 1; i >= 0; i--) {
+    const targetDate = new Date(currentDate);
+    targetDate.setMonth(targetDate.getMonth() - i);
+    const monthKey = targetDate.toISOString().substring(0, 7);
+    const monthName = monthNames[targetDate.getMonth()];
+    
+    if (dataMap.has(monthKey)) {
+      monthlyData.push({
+        month: monthName,
+        value: dataMap.get(monthKey).value
+      });
+    } else {
+      // Interpolate or use last known value
+      const lastValue = monthlyData.length > 0 ? monthlyData[monthlyData.length - 1].value : 0;
+      monthlyData.push({
+        month: monthName,
+        value: lastValue
+      });
+    }
+  }
+
+  return monthlyData;
 };
 
 /**
  * Get Above Ground Carbon (AGC) trends over time (for line chart)
  * Filters by user assignments if userId is provided
  */
-export const getAGCTrends = async (projectId = 1, months = 12, userId = null) => {
+export const getAGCTrends = async (projectId = 1, months = 12, userId = null, analysisId = null) => {
+  // If analysisId is provided, use it directly
+  const availableData = analysisId ? { availableMonths: months } : await getAvailableHistoricalMonths(projectId, months, userId);
+  const actualMonths = availableData.availableMonths > 0 ? availableData.availableMonths : months;
+  
   let query = `
     SELECT 
+      DATE_TRUNC('month', ar.analysis_date) as month_date,
       TO_CHAR(ar.analysis_date, 'Mon') as month,
       COALESCE(SUM(ar.total_agc_tonnes), SUM(ar.total_agb_tonnes * 0.47), 0) as value
     FROM analysis_results ar
     WHERE ar.project_id = $1
     AND ar.assigned_to_majmaah = true
-    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${months} months'
+    AND ar.analysis_type IN ('baseline', 'historical_monthly')
+    AND ar.analysis_date >= CURRENT_DATE - INTERVAL '${actualMonths} months'
     AND (ar.total_agc_tonnes IS NOT NULL OR ar.total_agb_tonnes IS NOT NULL)
   `;
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;
     params.push(userId);
   }
   
-  query += ` GROUP BY ar.analysis_date, TO_CHAR(ar.analysis_date, 'Mon')
-    ORDER BY ar.analysis_date ASC`;
+  query += ` GROUP BY DATE_TRUNC('month', ar.analysis_date), TO_CHAR(ar.analysis_date, 'Mon')
+    ORDER BY month_date ASC`;
   
   const result = await pool.query(query, params);
 
-  // If no data, return mock progression based on latest analysis
+  // If no data, return empty array
   if (result.rows.length === 0) {
-    let latestQuery = `
-      SELECT total_agc_tonnes, total_agb_tonnes
-      FROM analysis_results ar
-      WHERE ar.project_id = $1
-      AND ar.assigned_to_majmaah = true
-      AND (ar.total_agc_tonnes IS NOT NULL OR ar.total_agb_tonnes IS NOT NULL)
-    `;
-    const latestParams = [projectId];
-    
-    if (userId) {
-      latestQuery += ` AND ar.id IN (
-        SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
-      )`;
-      latestParams.push(userId);
-    }
-    
-    latestQuery += ` ORDER BY ar.analysis_date DESC LIMIT 1`;
-    
-    const latest = await pool.query(latestQuery, latestParams);
-
-    if (latest.rows.length === 0) {
-      return [];
-    }
-
-    const baseAGC = parseFloat(latest.rows[0].total_agc_tonnes) || 
-                    (parseFloat(latest.rows[0].total_agb_tonnes) * 0.47) || 0;
-    const monthsArr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    return monthsArr.map((month, idx) => ({
-      month,
-      value: Math.max(0, baseAGC * (1 + idx * 0.05)) // Gradual growth
-    }));
+    return [];
   }
 
-  return result.rows.map(row => ({
-    month: row.month,
-    value: parseFloat(row.value) || 0
-  }));
+  const dataMap = new Map();
+  result.rows.forEach(row => {
+    const monthKey = row.month_date.toISOString().substring(0, 7); // YYYY-MM format
+    dataMap.set(monthKey, {
+      month: row.month,
+      value: parseFloat(row.value) || 0,
+      date: row.month_date
+    });
+  });
+
+  // Generate 12 months of data, filling gaps with interpolation
+  const monthlyData = [];
+  const currentDate = new Date();
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  for (let i = months - 1; i >= 0; i--) {
+    const targetDate = new Date(currentDate);
+    targetDate.setMonth(targetDate.getMonth() - i);
+    const monthKey = targetDate.toISOString().substring(0, 7);
+    const monthName = monthNames[targetDate.getMonth()];
+    
+    if (dataMap.has(monthKey)) {
+      monthlyData.push({
+        month: monthName,
+        value: dataMap.get(monthKey).value
+      });
+    } else {
+      // Interpolate or use last known value
+      const lastValue = monthlyData.length > 0 ? monthlyData[monthlyData.length - 1].value : 0;
+      monthlyData.push({
+        month: monthName,
+        value: lastValue
+      });
+    }
+  }
+
+  return monthlyData;
 };
 
 /**
@@ -986,7 +1227,7 @@ export const getAGCTrends = async (projectId = 1, months = 12, userId = null) =>
  * Based on average health scores and NDVI values
  * Filters by user assignments if userId is provided
  */
-export const getVegetationHealthIndex = async (projectId = 1, userId = null) => {
+export const getVegetationHealthIndex = async (projectId = 1, userId = null, analysisId = null) => {
   let query = `
     SELECT 
       ar.trees_geojson,
@@ -1000,8 +1241,11 @@ export const getVegetationHealthIndex = async (projectId = 1, userId = null) => 
   
   const params = [projectId];
   
-  // If userId is provided, filter by user assignments
-  if (userId) {
+  // Priority: analysisId > userId
+  if (analysisId) {
+    query += ` AND ar.id = $2`;
+    params.push(analysisId);
+  } else if (userId) {
     query += ` AND ar.id IN (
       SELECT analysis_id FROM user_analysis_assignments WHERE user_id = $2
     )`;

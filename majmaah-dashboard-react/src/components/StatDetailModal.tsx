@@ -7,7 +7,7 @@ import { config } from '@/config';
 interface StatDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  statType: 'trees' | 'carbon' | 'survival' | 'communities' | null;
+  statType: 'trees' | 'carbon' | 'survival' | null;
   data: any;
 }
 
@@ -55,13 +55,6 @@ export const StatDetailModal: React.FC<StatDetailModalProps> = ({
             ...data,
             survivalChartData: survivalData.success ? survivalData.data.map((s: any) => ({ month: s.year, value: s.rate })) : [],
             treesMonitored: data?.totalTrees || 'N/A',
-          });
-          break;
-        case 'communities':
-          setDetailData({
-            ...data,
-            localJobs: 12,
-            communitiesChartData: [{ month: 'Jan', value: 8 }, { month: 'Feb', value: 9 }, { month: 'Mar', value: 10 }, { month: 'Apr', value: 11 }, { month: 'May', value: 12 }],
           });
           break;
       }
@@ -166,35 +159,6 @@ export const StatDetailModal: React.FC<StatDetailModalProps> = ({
           chartData: currentData?.survivalChartData || [],
           chartLabel: 'Survival Rate Over Time',
         };
-      case 'communities':
-        return {
-          title: 'Communities Supported - Detailed Information',
-          description: 'Social and economic impact metrics',
-          sections: [
-            {
-              label: 'Communities Supported',
-              value: currentData?.communitiesSupported || 0,
-              unit: 'communities',
-            },
-            {
-              label: 'Local Jobs Created',
-              value: currentData?.localJobs || '12',
-              unit: 'jobs',
-            },
-            {
-              label: 'Economic Value',
-              value: '$8,500',
-              unit: 'USD',
-            },
-            {
-              label: 'Research Projects',
-              value: '4',
-              unit: 'projects',
-            },
-          ],
-          chartData: currentData?.communitiesChartData || [],
-          chartLabel: 'Community Impact Over Time',
-        };
       default:
         return null;
     }
@@ -285,7 +249,6 @@ export const StatDetailModal: React.FC<StatDetailModalProps> = ({
                   {statType === 'trees' && 'Tree detection is performed using Google Earth Engine (GEE) satellite imagery analysis. The system identifies individual trees and calculates health metrics based on NDVI and other vegetation indices.'}
                   {statType === 'carbon' && 'Carbon sequestration is calculated using Above Ground Carbon (AGC) and Soil Organic Carbon (SOC) estimates from GEE analysis. Values are converted to CO₂ equivalent using standard conversion factors.'}
                   {statType === 'survival' && 'Survival rate is monitored through regular satellite analysis and field verification. The rate reflects the percentage of trees that remain healthy and growing over the monitoring period.'}
-                  {statType === 'communities' && 'Community impact metrics include local employment opportunities, economic value generation, and research collaboration projects initiated through the tree planting program.'}
                 </p>
               </div>
             </>
@@ -305,4 +268,3 @@ export const StatDetailModal: React.FC<StatDetailModalProps> = ({
     </div>
   );
 };
-

@@ -5,6 +5,12 @@ import { LanguageProvider } from '@/context/LanguageContext';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Login } from '@/pages/auth/Login';
 import { Dashboard } from '@/pages/Dashboard';
+import PlantingRecordsCertificates from '@/pages/PlantingRecordsCertificates';
+import TreesCertificate from '@/pages/TreesCertificate';
+import Departments from '@/pages/Departments';
+import Employees from '@/pages/Employees';
+import PlantingRecordAssignments from '@/pages/PlantingRecordAssignments';
+import CertificationsHistory from '@/pages/CertificationsHistory';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -48,13 +54,13 @@ const AppRoutes: React.FC = () => {
       >
         <Route index element={<Dashboard />} />
         {/* Content Management */}
-        <Route path="planting-records-certificates" element={<PlaceholderPage title="Planting Records Certificates" />} />
-        <Route path="departments" element={<PlaceholderPage title="Departments" />} />
-        <Route path="employees" element={<PlaceholderPage title="Employees" />} />
-        <Route path="planting-record-assignments" element={<PlaceholderPage title="Planting Record Assignments" />} />
-        <Route path="certifications-history" element={<PlaceholderPage title="Certifications History" />} />
+        <Route path="planting-records-certificates" element={<PlantingRecordsCertificates />} />
+        <Route path="departments" element={<Departments />} />
+        <Route path="employees" element={<Employees />} />
+        <Route path="planting-record-assignments" element={<PlantingRecordAssignments />} />
+        <Route path="certifications-history" element={<CertificationsHistory />} />
         {/* Company Certificate */}
-        <Route path="trees-certificate" element={<PlaceholderPage title="Trees Certificate" />} />
+        <Route path="trees-certificate" element={<TreesCertificate />} />
         <Route path="basic-certificate" element={<PlaceholderPage title="Basic Certificate" />} />
         {/* Profile */}
         <Route path="my-profile" element={<PlaceholderPage title="My Profile" />} />

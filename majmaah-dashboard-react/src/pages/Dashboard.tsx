@@ -15,9 +15,18 @@ import {
   VegetationHealthIndexChart,
   AGCTrendsChart,
 } from '@/components/widgets/ChartWidgets';
-import { Download, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw, ChevronDown } from 'lucide-react';
 import apiService from '@/services/api';
 import { DynamicReportModal } from '@/components/DynamicReportModal';
+
+interface Analysis {
+  id: number;
+  analysisId: number;
+  displayName: string;
+  analysisDate: string;
+  treeCount?: number;
+  carbonTonnes?: number;
+}
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -27,6 +36,9 @@ export const Dashboard: React.FC = () => {
   const [dataSource, setDataSource] = useState<'real' | 'mock'>('mock');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [analyses, setAnalyses] = useState<Analysis[]>([]);
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState<number | null>(null);
+  const [loadingAnalyses, setLoadingAnalyses] = useState(false);
 
   // Fetch real data from NDVI backend
   const fetchRealData = async () => {
@@ -48,10 +60,38 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Fetch user's assigned analyses
+  const fetchUserAnalyses = async () => {
+    setLoadingAnalyses(true);
+    try {
+      const response = await apiService.getMyAnalyses();
+      if (response.success && response.data) {
+        setAnalyses(response.data);
+        // Auto-select first analysis if available
+        if (response.data.length > 0 && !selectedAnalysisId) {
+          setSelectedAnalysisId(response.data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user analyses:', error);
+    } finally {
+      setLoadingAnalyses(false);
+    }
+  };
+
   useEffect(() => {
     // Try to connect to real backend on mount
     fetchRealData();
+    // Fetch user's assigned analyses
+    fetchUserAnalyses();
   }, []);
+
+  // When selected analysis changes, refresh dashboard data
+  useEffect(() => {
+    if (selectedAnalysisId) {
+      fetchRealData();
+    }
+  }, [selectedAnalysisId]);
 
   const handleDownloadReport = () => {
     // Open modal to view PDF
@@ -62,8 +102,28 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Header - Exact Filament Style (matching screenshot) */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{t('dashboard.title')}</h1>
+        <div className="flex-1">
+          <div className="flex items-center gap-4 mb-2">
+            <h1 className="text-3xl font-bold text-gray-900">{t('dashboard.title')}</h1>
+            {/* Analysis Selector Dropdown */}
+            {analyses.length > 0 && (
+              <div className="relative">
+                <select
+                  value={selectedAnalysisId || ''}
+                  onChange={(e) => setSelectedAnalysisId(e.target.value ? parseInt(e.target.value) : null)}
+                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
+                  disabled={loadingAnalyses}
+                >
+                  {analyses.map((analysis) => (
+                    <option key={analysis.id} value={analysis.id}>
+                      {analysis.displayName}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+            )}
+          </div>
           {/* Data Source Indicator */}
           <div className="flex items-center gap-2 mt-2">
             {loading ? (
@@ -113,55 +173,37 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Stats Overview */}
-      <StatsOverview />
+      <StatsOverview selectedAnalysisId={selectedAnalysisId} />
 
       {/* Widgets for Advanced Client */}
       {isAdvancedClient && (
         <>
           {/* Project Impact Map (Full Width) */}
-          <ProjectImpactWidget />
+          <ProjectImpactWidget selectedAnalysisId={selectedAnalysisId} />
 
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <GrowthCarbonImpactChart />
-            <CarbonSequestrationChart />
-            <CanopyCoverageChart />
-            <NDVITrendsChart />
-            <EVITrendsChart />
-            <VegetationHealthChart />
-            <SurvivalRateChart />
-            <VegetationHealthIndexChart />
-            <AGCTrendsChart />
+            <GrowthCarbonImpactChart selectedAnalysisId={selectedAnalysisId} />
+            <CarbonSequestrationChart selectedAnalysisId={selectedAnalysisId} />
+            <CanopyCoverageChart selectedAnalysisId={selectedAnalysisId} />
+            <NDVITrendsChart selectedAnalysisId={selectedAnalysisId} />
+            <EVITrendsChart selectedAnalysisId={selectedAnalysisId} />
+            <VegetationHealthChart selectedAnalysisId={selectedAnalysisId} />
+            <SurvivalRateChart selectedAnalysisId={selectedAnalysisId} />
+            <VegetationHealthIndexChart selectedAnalysisId={selectedAnalysisId} />
+            <AGCTrendsChart selectedAnalysisId={selectedAnalysisId} />
           </div>
 
-          {/* Community Impact Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="widget-card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('dashboard.communityEngagement')}</h3>
-              <p className="text-3xl font-bold text-primary-600">1,254</p>
-              <p className="text-sm text-gray-600 mt-2">{t('dashboard.volunteersParticipated')}</p>
-            </div>
-            <div className="widget-card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('dashboard.educationalPrograms')}</h3>
-              <p className="text-3xl font-bold text-primary-600">48</p>
-              <p className="text-sm text-gray-600 mt-2">{t('dashboard.workshopsConducted')}</p>
-            </div>
-            <div className="widget-card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('dashboard.researchPublications')}</h3>
-              <p className="text-3xl font-bold text-primary-600">12</p>
-              <p className="text-sm text-gray-600 mt-2">{t('dashboard.papersPublished')}</p>
-            </div>
-          </div>
         </>
       )}
 
       {/* Widgets for Admin/Super Admin */}
       {!isAdvancedClient && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <VegetationHealthIndexChart />
-          <NDVITrendsChart />
-          <CarbonSequestrationChart />
-          <SurvivalRateChart />
+          <VegetationHealthIndexChart selectedAnalysisId={selectedAnalysisId} />
+          <NDVITrendsChart selectedAnalysisId={selectedAnalysisId} />
+          <CarbonSequestrationChart selectedAnalysisId={selectedAnalysisId} />
+          <SurvivalRateChart selectedAnalysisId={selectedAnalysisId} />
         </div>
       )}
 
@@ -169,6 +211,7 @@ export const Dashboard: React.FC = () => {
       <DynamicReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
+        selectedAnalysisId={selectedAnalysisId}
       />
     </div>
   );

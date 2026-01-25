@@ -45,16 +45,54 @@ router.delete('/admin/analysis/:analysisId', authenticateToken, deleteAnalysis);
 // ============================================
 
 /**
+ * Get user's assigned analyses (for dropdown selection)
+ */
+router.get('/majmaah/my-analyses', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.userId || null;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    const userService = await import('../services/userService.js');
+    const analyses = await userService.getUserAssignedAnalyses(userId);
+    
+    res.json({
+      success: true,
+      data: analyses.map(a => ({
+        id: a.analysis_id,
+        analysisId: a.analysis_id,
+        displayName: a.display_name || `Analysis ${a.analysis_id}`,
+        analysisDate: a.analysis_date,
+        treeCount: a.tree_count,
+        carbonTonnes: a.co2_equivalent_tonnes,
+        assignedAt: a.assigned_at
+      }))
+    });
+  } catch (error) {
+    console.error('Error getting user analyses:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
  * Get dashboard stats for stat cards
  * Returns: Trees Planted, Carbon, Survival Rate, Communities
- * Filters by user assignments if user is authenticated
+ * Filters by selected analysisId if provided, otherwise by user assignments
  */
 router.get('/majmaah/dashboard-stats', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1 } = req.query;
-    const userId = req.user?.userId || null; // Get user ID from token
+    const { projectId = 1, analysisId } = req.query;
+    const userId = req.user?.userId || null;
     
-    const stats = await db.getMajmaahDashboardStats(parseInt(projectId), userId);
+    // If analysisId is provided, use it; otherwise use userId filtering
+    const stats = await db.getMajmaahDashboardStats(parseInt(projectId), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -118,9 +156,10 @@ router.get('/majmaah/analysis-history', authenticateToken, async (req, res) => {
  */
 router.get('/majmaah/carbon-trends', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1, months = 12 } = req.query;
+    const { projectId = 1, months = 12, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const trends = await db.getCarbonTrends(parseInt(projectId), parseInt(months), userId);
+    // Use analysisId if provided, otherwise use userId
+    const trends = await db.getCarbonTrends(parseInt(projectId), parseInt(months), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -140,9 +179,9 @@ router.get('/majmaah/carbon-trends', authenticateToken, async (req, res) => {
  */
 router.get('/majmaah/canopy-coverage', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1 } = req.query;
+    const { projectId = 1, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const data = await db.getCanopyCoverageDistribution(parseInt(projectId), userId);
+    const data = await db.getCanopyCoverageDistribution(parseInt(projectId), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -162,9 +201,9 @@ router.get('/majmaah/canopy-coverage', authenticateToken, async (req, res) => {
  */
 router.get('/majmaah/species-richness', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1 } = req.query;
+    const { projectId = 1, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const data = await db.getSpeciesRichnessData(parseInt(projectId), userId);
+    const data = await db.getSpeciesRichnessData(parseInt(projectId), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -184,9 +223,9 @@ router.get('/majmaah/species-richness', authenticateToken, async (req, res) => {
  */
 router.get('/majmaah/ecosystem-services', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1 } = req.query;
+    const { projectId = 1, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const data = await db.getEcosystemServices(parseInt(projectId), userId);
+    const data = await db.getEcosystemServices(parseInt(projectId), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -206,9 +245,9 @@ router.get('/majmaah/ecosystem-services', authenticateToken, async (req, res) =>
  */
 router.get('/majmaah/vegetation-health', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1 } = req.query;
+    const { projectId = 1, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const data = await db.getVegetationHealthDistribution(parseInt(projectId), userId);
+    const data = await db.getVegetationHealthDistribution(parseInt(projectId), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -228,9 +267,9 @@ router.get('/majmaah/vegetation-health', authenticateToken, async (req, res) => 
  */
 router.get('/majmaah/survival-rate', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1 } = req.query;
+    const { projectId = 1, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const data = await db.getSurvivalRateData(parseInt(projectId), userId);
+    const data = await db.getSurvivalRateData(parseInt(projectId), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -250,9 +289,9 @@ router.get('/majmaah/survival-rate', authenticateToken, async (req, res) => {
  */
 router.get('/majmaah/growth-carbon-impact', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1, months = 12 } = req.query;
+    const { projectId = 1, months = 12, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const data = await db.getGrowthCarbonImpact(parseInt(projectId), parseInt(months), userId);
+    const data = await db.getGrowthCarbonImpact(parseInt(projectId), parseInt(months), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -272,9 +311,9 @@ router.get('/majmaah/growth-carbon-impact', authenticateToken, async (req, res) 
  */
 router.get('/majmaah/trees-for-map', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1 } = req.query;
+    const { projectId = 1, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const trees = await db.getMajmaahTreesForMap(parseInt(projectId), userId);
+    const trees = await db.getMajmaahTreesForMap(parseInt(projectId), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -322,9 +361,9 @@ router.get('/majmaah/analysis/:analysisId', async (req, res) => {
  */
 router.get('/majmaah/ndvi-trends', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1, months = 12 } = req.query;
+    const { projectId = 1, months = 12, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const trends = await db.getNDVITrends(parseInt(projectId), parseInt(months), userId);
+    const trends = await db.getNDVITrends(parseInt(projectId), parseInt(months), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -344,9 +383,9 @@ router.get('/majmaah/ndvi-trends', authenticateToken, async (req, res) => {
  */
 router.get('/majmaah/evi-trends', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1, months = 12 } = req.query;
+    const { projectId = 1, months = 12, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const trends = await db.getEVITrends(parseInt(projectId), parseInt(months), userId);
+    const trends = await db.getEVITrends(parseInt(projectId), parseInt(months), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -366,9 +405,9 @@ router.get('/majmaah/evi-trends', authenticateToken, async (req, res) => {
  */
 router.get('/majmaah/vegetation-health-index', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1 } = req.query;
+    const { projectId = 1, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const data = await db.getVegetationHealthIndex(parseInt(projectId), userId);
+    const data = await db.getVegetationHealthIndex(parseInt(projectId), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,
@@ -388,9 +427,9 @@ router.get('/majmaah/vegetation-health-index', authenticateToken, async (req, re
  */
 router.get('/majmaah/agc-trends', authenticateToken, async (req, res) => {
   try {
-    const { projectId = 1, months = 12 } = req.query;
+    const { projectId = 1, months = 12, analysisId } = req.query;
     const userId = req.user?.userId || null;
-    const trends = await db.getAGCTrends(parseInt(projectId), parseInt(months), userId);
+    const trends = await db.getAGCTrends(parseInt(projectId), parseInt(months), analysisId ? null : userId, analysisId ? parseInt(analysisId) : null);
     
     res.json({
       success: true,

@@ -1,7 +1,32 @@
 // Baseline Assessment Service for URIMPACT - Wadi Al Batha
 import ee from '@google/earthengine';
 
-const BASELINE_WINDOW_DAYS = 90; // rolling window for latest imagery
+const BASELINE_WINDOW_DAYS = 90; // rolling window for latest imagery (for single snapshot)
+const HISTORICAL_MONTHS = 12; // months of historical data to fetch for trends
+
+// Helper function to get month start and end dates
+const getMonthRange = (monthsAgo) => {
+  const currentDate = new Date();
+  const targetYear = currentDate.getFullYear();
+  const targetMonth = currentDate.getMonth() - monthsAgo;
+  
+  // Handle year rollover
+  const actualYear = targetMonth < 0 ? targetYear - 1 : targetYear;
+  const actualMonth = ((targetMonth % 12) + 12) % 12;
+  
+  // Create target date (first day of the month)
+  const targetDate = new Date(actualYear, actualMonth, 1);
+  
+  // GEE uses 1-based months
+  const startDate = ee.Date.fromYMD(actualYear, actualMonth + 1, 1);
+  
+  // End date is the last day of the month (first day of next month minus 1 day)
+  const nextMonth = actualMonth === 11 ? 0 : actualMonth + 1;
+  const nextYear = actualMonth === 11 ? actualYear + 1 : actualYear;
+  const endDate = ee.Date.fromYMD(nextYear, nextMonth + 1, 1).advance(-1, 'day');
+  
+  return { startDate, endDate, targetDate };
+};
 
 const getVegThresholds = (mode = 'mature') => {
   if (mode === 'young') {
@@ -249,6 +274,7 @@ export const analyzeExistingVegetation = async (coordinates = null, options = {}
     const ndre = image.normalizedDifference(['B8', 'B5']).rename('NDRE');
     // EVI (Enhanced Vegetation Index)
     // EVI formula requires reflectance values (0-1), not scaled integers
+    // Clamp to valid range to prevent extreme values from artifacts (water, bright surfaces)
     const evi = image.expression(
       '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))',
       {
@@ -256,7 +282,9 @@ export const analyzeExistingVegetation = async (coordinates = null, options = {}
         RED: image.select('B4'),
         BLUE: image.select('B2')
       }
-    ).rename('EVI');
+    )
+    .clamp(-1, 1) // Clamp EVI to valid range at calculation time
+    .rename('EVI');
     // MSAVI2 (soil-adjusted for sparse/young vegetation)
     const msavi2 = image.expression(
       '(2 * NIR + 1 - sqrt((2 * NIR + 1) ** 2 - 8 * (NIR - RED))) / 2',
@@ -642,6 +670,7 @@ export const generateBaselineImagery = async (coordinates = null) => {
     
     // Calculate EVI (Enhanced Vegetation Index)
     // EVI formula requires reflectance values (0-1), not scaled integers
+    // Clamp to valid range to prevent extreme values from artifacts
     const evi = image.expression(
       '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))',
       {
@@ -649,7 +678,9 @@ export const generateBaselineImagery = async (coordinates = null) => {
         RED: image.select('B4'),
         BLUE: image.select('B2')
       }
-    ).rename('EVI');
+    )
+    .clamp(-1, 1) // Clamp EVI to valid range at calculation time
+    .rename('EVI');
 
     // Get statistics
     const ndviStats = await withTimeout(
@@ -758,29 +789,238 @@ export const generateBaselineImagery = async (coordinates = null) => {
   }
 };
 
+// 6. Generate Historical Monthly Analysis (configurable months)
+export const generateHistoricalMonthlyAnalysis = async (coordinates = null, options = {}) => {
+  try {
+    // Debug: Log what we received
+    console.log('📊 Historical analysis options:', { 
+      historicalMonths: options.historicalMonths, 
+      defaultMonths: HISTORICAL_MONTHS,
+      allOptions: Object.keys(options)
+    });
+    
+    const months = options.historicalMonths || HISTORICAL_MONTHS;
+    console.log(`Starting historical monthly analysis for ${months} months...`);
+    
+    const coords = coordinates || WADI_AL_BATHA_DEFAULT;
+    const region = ee.Geometry.Polygon([coords]);
+    const thresholds = getVegThresholds(options.vegetationMode);
+    const monthlyResults = [];
+
+    // Process each month going back N months
+    for (let monthOffset = 0; monthOffset < months; monthOffset++) {
+      try {
+        const { startDate, endDate, targetDate } = getMonthRange(monthOffset);
+        
+        console.log(`Processing month ${monthOffset + 1}/${months}: ${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`);
+
+        // Get monthly composite (median of all images in the month)
+        const monthlyCollection = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+          .filterBounds(region)
+          .filterDate(startDate, endDate)
+          .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20)); // Allow slightly higher cloud cover for composites
+
+        // Create monthly composite using median
+        const composite = monthlyCollection
+          .median()
+          .multiply(0.0001) // Convert to reflectance
+          .clip(region);
+
+        // Skip if no imagery available for this month
+        const imageCount = monthlyCollection.size();
+        const imageCountValue = await withTimeout(
+          new Promise((resolve, reject) => {
+            imageCount.evaluate((result, error) => {
+              if (error) reject(error);
+              else resolve(result);
+            });
+          })
+        );
+
+        if (imageCountValue === 0) {
+          console.log(`  ⚠️  No imagery available for ${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}, skipping...`);
+          continue;
+        }
+
+        // Calculate NDVI
+        const ndvi = composite.normalizedDifference(['B8', 'B4']).rename('NDVI');
+        
+        // Calculate EVI with improved formula to handle edge cases
+        // Add masking to avoid division by zero and extreme values
+        const evi = composite.expression(
+          '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))',
+          {
+            NIR: composite.select('B8'),
+            RED: composite.select('B4'),
+            BLUE: composite.select('B2')
+          }
+        )
+        .clamp(-1, 1) // Clamp EVI to valid range at calculation time
+        .rename('EVI');
+
+        // Calculate NDRE and MSAVI2 for vegetation detection
+        const ndre = composite.normalizedDifference(['B8', 'B5']).rename('NDRE');
+        const msavi2 = composite.expression(
+          '(2 * NIR + 1 - sqrt((2 * NIR + 1) ** 2 - 8 * (NIR - RED))) / 2',
+          {
+            NIR: composite.select('B8'),
+            RED: composite.select('B4')
+          }
+        ).rename('MSAVI2');
+
+        // Get NDVI/EVI statistics
+        const ndviStats = await withTimeout(
+          new Promise((resolve, reject) => {
+            ndvi.reduceRegion({
+              reducer: ee.Reducer.minMax().combine(ee.Reducer.mean(), null, true),
+              geometry: region,
+              scale: 10,
+              maxPixels: 1e9
+            }).evaluate((result, error) => {
+              if (error) reject(error);
+              else resolve(result);
+            });
+          })
+        );
+
+        // Get EVI statistics with masking for valid pixels only
+        // Mask out pixels where EVI calculation might be invalid (water, bright surfaces)
+        const validEVI = evi.updateMask(
+          composite.select('B8').gt(0.01) // NIR > 0.01 (not water/void)
+          .and(composite.select('B4').gt(0.01)) // RED > 0.01
+          .and(composite.select('B2').gt(0.01)) // BLUE > 0.01
+        );
+        
+        const eviStats = await withTimeout(
+          new Promise((resolve, reject) => {
+            validEVI.reduceRegion({
+              reducer: ee.Reducer.minMax().combine(ee.Reducer.mean(), null, true),
+              geometry: region,
+              scale: 10,
+              maxPixels: 1e9
+            }).evaluate((result, error) => {
+              if (error) reject(error);
+              else resolve(result);
+            });
+          })
+        );
+
+        // Calculate vegetation metrics
+        const vegetationMask = ndvi.gt(thresholds.ndviPrimary)
+          .or(ndre.gt(thresholds.ndrePrimary))
+          .or(msavi2.gt(thresholds.ndviPrimary - 0.05));
+
+        const canopyCoverage = await withTimeout(
+          new Promise((resolve, reject) => {
+            vegetationMask.reduceRegion({
+              reducer: ee.Reducer.mean(),
+              geometry: region,
+              scale: 10,
+              maxPixels: 1e9
+            }).evaluate((result, error) => {
+              if (error) reject(error);
+              else resolve(result);
+            });
+          })
+        );
+
+        // Estimate AGB for this month
+        const canopyDiameter = vegetationMask.multiply(
+          ndvi.subtract(thresholds.ndviPrimary).max(0).multiply(20).max(1)
+        ).rename('canopyDiameter');
+        
+        const agbPerPixel = canopyDiameter.pow(2.5).multiply(0.0673).rename('AGB');
+
+        const agbStats = await withTimeout(
+          new Promise((resolve, reject) => {
+            agbPerPixel.reduceRegion({
+              reducer: ee.Reducer.sum().combine(ee.Reducer.mean(), null, true),
+              geometry: region,
+              scale: 10,
+              maxPixels: 1e9
+            }).evaluate((result, error) => {
+              if (error) reject(error);
+              else resolve(result);
+            });
+          })
+        );
+
+        const totalAGB = agbStats.AGB_sum || 0;
+        const totalAGBTonnes = totalAGB / 1000;
+        const totalCarbonTonnes = totalAGBTonnes * 0.47;
+        const co2EquivalentTonnes = totalCarbonTonnes * 3.67;
+
+        // Store monthly result
+        monthlyResults.push({
+          year: targetDate.getFullYear(),
+          month: targetDate.getMonth() + 1, // 1-12
+          monthKey: `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`,
+          analysisDate: targetDate.toISOString().split('T')[0], // YYYY-MM-DD format
+          ndviMean: ndviStats.NDVI_mean || 0,
+          ndviMin: ndviStats.NDVI_min || -1,
+          ndviMax: ndviStats.NDVI_max || 1,
+          eviMean: eviStats.EVI_mean || 0,
+          eviMin: eviStats.EVI_min || -1,
+          eviMax: eviStats.EVI_max || 1,
+          canopyCoverPercent: (canopyCoverage.NDVI || 0) * 100,
+          totalAGBTonnes: totalAGBTonnes,
+          totalCarbonTonnes: totalCarbonTonnes,
+          totalAGCTonnes: totalCarbonTonnes, // AGC = Carbon from AGB
+          co2EquivalentTonnes: co2EquivalentTonnes,
+          imageCount: imageCountValue
+        });
+
+        console.log(`  ✅ Month ${monthOffset + 1} complete: NDVI=${(ndviStats.NDVI_mean || 0).toFixed(3)}, Carbon=${totalCarbonTonnes.toFixed(2)} tons`);
+      } catch (monthError) {
+        console.error(`  ❌ Error processing month ${monthOffset + 1}:`, monthError.message);
+        // Continue to next month even if one fails
+      }
+    }
+
+    console.log(`✅ Historical monthly analysis complete: ${monthlyResults.length} months processed`);
+    return monthlyResults.reverse(); // Return oldest to newest
+  } catch (error) {
+    console.error('Historical monthly analysis error:', error);
+    throw error;
+  }
+};
+
 // 5. Complete Baseline Assessment
 export const performBaselineAssessment = async (coordinates = null, options = {}) => {
   try {
     console.log('Starting comprehensive baseline assessment...');
+    console.log('📋 Baseline assessment options:', options);
     
     const coords = coordinates || WADI_AL_BATHA_DEFAULT;
     
-    // Run all analyses
-    const [siteDefinition, vegetation, agb, imagery] = await Promise.all([
+    // Run all analyses (including historical)
+    const [siteDefinition, vegetation, agb, imagery, historicalMonthly] = await Promise.allSettled([
       analyzeSiteDefinition(coords, options),
       analyzeExistingVegetation(coords, options),
       estimateAGB(coords, options),
-      generateBaselineImagery(coords)
+      generateBaselineImagery(coords),
+      generateHistoricalMonthlyAnalysis(coords, options)
     ]);
 
-    return {
+    // Extract results (handle rejected promises)
+    const results = {
       aoi: coords,
-      siteDefinition,
-      existingVegetation: vegetation,
-      agbEstimation: agb,
-      baselineImagery: imagery,
+      siteDefinition: siteDefinition.status === 'fulfilled' ? siteDefinition.value : null,
+      existingVegetation: vegetation.status === 'fulfilled' ? vegetation.value : null,
+      agbEstimation: agb.status === 'fulfilled' ? agb.value : null,
+      baselineImagery: imagery.status === 'fulfilled' ? imagery.value : null,
+      historicalMonthly: historicalMonthly.status === 'fulfilled' ? historicalMonthly.value : [],
       timestamp: new Date().toISOString()
     };
+
+    // Log any failures
+    if (siteDefinition.status === 'rejected') console.error('Site definition failed:', siteDefinition.reason);
+    if (vegetation.status === 'rejected') console.error('Vegetation analysis failed:', vegetation.reason);
+    if (agb.status === 'rejected') console.error('AGB estimation failed:', agb.reason);
+    if (imagery.status === 'rejected') console.error('Baseline imagery failed:', imagery.reason);
+    if (historicalMonthly.status === 'rejected') console.error('Historical monthly analysis failed:', historicalMonthly.reason);
+
+    return results;
   } catch (error) {
     console.error('Baseline assessment error:', error);
     throw error;

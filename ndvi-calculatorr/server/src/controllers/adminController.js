@@ -1,5 +1,6 @@
 // Admin Controller - Manage analysis assignments to Majmaah dashboard
 import * as db from '../services/databaseService.js';
+import pool from '../config/database.js';
 
 /**
  * Get all unassigned analyses
@@ -166,7 +167,7 @@ export const updateAssignment = async (req, res) => {
     const { analysisId } = req.params;
     const { displayName, notes, displayOrder } = req.body;
 
-    const client = await db.pool.connect();
+    const client = await pool.connect();
     try {
       if (displayName) {
         await client.query(`

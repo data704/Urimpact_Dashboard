@@ -1,6 +1,5 @@
 import React from 'react';
 import { X, Download } from 'lucide-react';
-
 interface ReportViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -8,8 +7,7 @@ interface ReportViewerModalProps {
   fileName: string;
 }
 
-export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
-  isOpen,
+export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({isOpen,
   onClose,
   pdfUrl,
   fileName,
@@ -113,4 +111,3 @@ export const ReportViewerModal: React.FC<ReportViewerModalProps> = ({
     </div>
   );
 };
-

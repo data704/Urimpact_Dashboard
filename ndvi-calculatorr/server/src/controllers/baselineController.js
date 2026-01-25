@@ -11,22 +11,35 @@ import { saveBaselineAssessment } from '../services/databaseService.js';
 
 export const getBaselineAssessment = async (req, res) => {
   try {
-    const { coordinates, vegetationMode, projectId = 1 } = req.body;
+    const { coordinates, vegetationMode, historicalMonths, projectId = 1 } = req.body;
+    
+    // Validate historicalMonths - ensure it's parsed correctly
+    // If historicalMonths is provided, parse it; otherwise default to 12
+    let months = 12; // Default
+    if (historicalMonths !== undefined && historicalMonths !== null) {
+      const parsed = parseInt(historicalMonths, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        months = Math.max(1, Math.min(24, parsed));
+      }
+    }
+    
+    console.log(`📅 Controller received historicalMonths: ${JSON.stringify(historicalMonths)} (type: ${typeof historicalMonths}) -> parsed to: ${months}`);
     
     // Perform GEE analysis (existing functionality)
-    const results = await performBaselineAssessment(coordinates, { vegetationMode });
+    const results = await performBaselineAssessment(coordinates, { vegetationMode, historicalMonths: months });
     
-    // NEW: Save results to PostgreSQL database
-    try {
-      const analysisId = await saveBaselineAssessment({
-        projectId,
-        coordinates,
-        siteDefinition: results.siteDefinition,
-        existingVegetation: results.existingVegetation,
-        agbEstimation: results.agbEstimation,
-        baselineImagery: results.baselineImagery,
-        fullResults: results
-      });
+      // NEW: Save results to PostgreSQL database
+      try {
+        const analysisId = await saveBaselineAssessment({
+          projectId,
+          coordinates,
+          siteDefinition: results.siteDefinition,
+          existingVegetation: results.existingVegetation,
+          agbEstimation: results.agbEstimation,
+          baselineImagery: results.baselineImagery,
+          historicalMonthly: results.historicalMonthly || [],
+          fullResults: results
+        });
       
       console.log(`✅ Baseline assessment saved to database (ID: ${analysisId})`);
       

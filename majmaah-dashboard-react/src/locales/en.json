@@ -29,7 +29,7 @@
   "sidebar": {
     "dashboard": "Dashboard",
     "contentManagement": "Content Management",
-    "plantingRecordsCertificates": "Planting Records Certificates",
+    "plantingRecordsCertificates": "Planting Records",
     "departments": "Departments",
     "employees": "Employees",
     "plantingRecordAssignments": "Planting Record Assignments",
@@ -97,7 +97,7 @@
       "poor": "Poor"
     },
     "mapWidget": {
-      "title": "Majmaah University – Tree Planting Potential (October 2025)",
+      "title": "Majmaah University -Tree Planting Analysis",
       "totalTrees": "Total Trees",
       "liveGeeData": "Live GEE data",
       "demoData": "Demo data",

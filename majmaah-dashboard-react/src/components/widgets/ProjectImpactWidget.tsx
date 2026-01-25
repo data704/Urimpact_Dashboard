@@ -5,6 +5,7 @@ import { WidgetCard } from './WidgetCard';
 import { mockMajmaahTrees } from '@/services/mockData';
 import apiService from '@/services/api';
 import { config } from '@/config';
+import MapStyleSwitcher, { MAP_STYLES } from './MapStyleSwitcher';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
 
@@ -17,13 +18,14 @@ interface MajmaahTree {
   health_condition: string;
 }
 
-export const ProjectImpactWidget: React.FC = () => {
+export const ProjectImpactWidget: React.FC<{ selectedAnalysisId?: number | null }> = ({ selectedAnalysisId }) => {
   const { t } = useTranslation();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [trees, setTrees] = useState<MajmaahTree[]>(mockMajmaahTrees);
   const [dataLoading, setDataLoading] = useState(true);
   const [useRealData, setUseRealData] = useState(false);
+  const [mapStyle, setMapStyle] = useState<string>(MAP_STYLES.street);
 
   // Helper function to calculate bounds from coordinates
   const calculateBounds = (coords: number[][]): mapboxgl.LngLatBounds | null => {
@@ -81,9 +83,11 @@ export const ProjectImpactWidget: React.FC = () => {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
+    const initialStyle = mapStyle;
+
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: initialStyle,
       center: config.mapbox.defaultCenter,
       zoom: config.mapbox.defaultZoom,
     });
@@ -91,8 +95,8 @@ export const ProjectImpactWidget: React.FC = () => {
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-left');
     map.current.addControl(new mapboxgl.FullscreenControl(), 'top-right');
 
-    map.current.on('load', () => {
-
+    // Define fetchAnalysisAndTrees outside the map.on('load') callback so it can be reused
+    const fetchAnalysisAndTrees = async () => {
       const addTreeLayers = (treeData: MajmaahTree[]) => {
         if (!map.current) return;
 
@@ -196,8 +200,6 @@ export const ProjectImpactWidget: React.FC = () => {
           });
         }
       };
-
-      const fetchAnalysisAndTrees = async () => {
         try {
           setDataLoading(true);
           
@@ -217,7 +219,7 @@ export const ProjectImpactWidget: React.FC = () => {
           }
           
           // Fetch trees
-          const treesResponse = await apiService.getTreesForMap(config.app.projectId);
+          const treesResponse = await apiService.getTreesForMap(config.app.projectId, selectedAnalysisId);
 
           if (treesResponse.success && Array.isArray(treesResponse.data) && treesResponse.data.length > 0) {
             const realTrees = treesResponse.data as MajmaahTree[];
@@ -281,6 +283,8 @@ export const ProjectImpactWidget: React.FC = () => {
         }
       };
 
+    // Initial fetch when map loads
+    map.current.on('load', () => {
       fetchAnalysisAndTrees();
     });
 
@@ -290,10 +294,169 @@ export const ProjectImpactWidget: React.FC = () => {
     };
   }, []);
 
+  // Refetch trees when selectedAnalysisId changes
+  useEffect(() => {
+    if (!map.current || !map.current.loaded() || selectedAnalysisId === null || selectedAnalysisId === undefined) return;
+    
+    const refetchTrees = async () => {
+      try {
+        setDataLoading(true);
+        const treesResponse = await apiService.getTreesForMap(config.app.projectId, selectedAnalysisId);
+        if (treesResponse.success && Array.isArray(treesResponse.data) && treesResponse.data.length > 0) {
+          const realTrees = treesResponse.data as MajmaahTree[];
+          setTrees(realTrees);
+          // Update map source if it exists
+          if (map.current?.getSource('trees')) {
+            const geojson: GeoJSON.FeatureCollection = {
+              type: 'FeatureCollection',
+              features: realTrees.map(tree => ({
+                type: 'Feature',
+                properties: { id: tree.id, species: tree.species, health: tree.health },
+                geometry: { type: 'Point', coordinates: tree.coordinates },
+              })),
+            };
+            (map.current.getSource('trees') as mapboxgl.GeoJSONSource).setData(geojson);
+          }
+        }
+      } catch (error) {
+        console.warn('Error refetching trees for selected analysis:', error);
+      } finally {
+        setDataLoading(false);
+      }
+    };
+    
+    refetchTrees();
+  }, [selectedAnalysisId]);
+
+  // Handle map style change
+  const handleStyleChange = (newStyle: string) => {
+    if (!map.current) return;
+    
+    setMapStyle(newStyle);
+    map.current.setStyle(newStyle);
+    
+    // Re-add tree layers when style loads
+    map.current.once('style.load', () => {
+      if (trees && trees.length > 0) {
+        const addTreeLayers = (treeData: MajmaahTree[]) => {
+          if (!map.current) return;
+
+          const geojson: GeoJSON.FeatureCollection = {
+            type: 'FeatureCollection',
+            features: treeData.map(tree => ({
+              type: 'Feature',
+              properties: {
+                id: tree.id,
+                species: tree.species,
+                health: tree.health,
+              },
+              geometry: {
+                type: 'Point',
+                coordinates: tree.coordinates,
+              },
+            })),
+          };
+
+          if (map.current.getSource('trees')) {
+            (map.current.getSource('trees') as mapboxgl.GeoJSONSource).setData(geojson);
+          } else {
+            map.current.addSource('trees', {
+              type: 'geojson',
+              data: geojson,
+              cluster: true,
+              clusterMaxZoom: config.mapbox.clusterMaxZoom,
+              clusterRadius: config.mapbox.clusterRadius,
+            });
+
+            // Cluster circles
+            map.current.addLayer({
+              id: 'clusters',
+              type: 'circle',
+              source: 'trees',
+              filter: ['has', 'point_count'],
+              paint: {
+                'circle-color': ['step', ['get', 'point_count'], '#10b981', 10, '#22c55e', 25, '#3b82f6', 50, '#2563eb'],
+                'circle-radius': ['step', ['get', 'point_count'], 18, 10, 22, 25, 26, 50, 32],
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#fff',
+              },
+            });
+
+            // Cluster count
+            map.current.addLayer({
+              id: 'cluster-count',
+              type: 'symbol',
+              source: 'trees',
+              filter: ['has', 'point_count'],
+              layout: {
+                'text-field': '{point_count_abbreviated}',
+                'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                'text-size': 12,
+              },
+              paint: {
+                'text-color': '#ffffff',
+              },
+            });
+
+            // Unclustered points
+            map.current.addLayer({
+              id: 'unclustered-point',
+              type: 'circle',
+              source: 'trees',
+              filter: ['!', ['has', 'point_count']],
+              paint: {
+                'circle-color': '#10b981',
+                'circle-radius': 8,
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#fff',
+              },
+            });
+
+            // Click handlers
+            map.current.on('click', 'unclustered-point', (e) => {
+              if (!e.features || e.features.length === 0) return;
+              const feature = e.features[0];
+              const coordinates = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
+              const props = feature.properties || {};
+
+              new mapboxgl.Popup()
+                .setLngLat(coordinates)
+                .setHTML(`
+                  <div style="padding: 10px;">
+                    <strong style="color: #13c5bc;">${t('dashboard.mapWidget.treeInformation')}</strong><br><br>
+                    <strong>${t('dashboard.mapWidget.id')}:</strong> ${props.id || 'N/A'}<br>
+                    <strong>${t('dashboard.mapWidget.species')}:</strong> ${props.species || 'Unknown'}<br>
+                    <strong>${t('dashboard.mapWidget.health')}:</strong> ${props.health || 'Unknown'}
+                  </div>
+                `)
+                .addTo(map.current!);
+            });
+
+            // Cursor
+            map.current.on('mouseenter', 'clusters', () => {
+              map.current!.getCanvas().style.cursor = 'pointer';
+            });
+            map.current.on('mouseleave', 'clusters', () => {
+              map.current!.getCanvas().style.cursor = '';
+            });
+          }
+        };
+        addTreeLayers(trees);
+      }
+    });
+  };
+
   return (
     <WidgetCard fullWidth title={t('dashboard.mapWidget.title')}>
       <div className="relative" style={{ height: '600px' }}>
         <div ref={mapContainer} className="w-full h-full rounded-xl" />
+        
+        {/* Map Style Switcher */}
+        <MapStyleSwitcher
+          currentStyle={mapStyle}
+          onStyleChange={handleStyleChange}
+          position="bottom-left"
+        />
         
         {/* Legend */}
         <div className="absolute bottom-4 right-4 bg-white rounded-lg shadow-lg p-4 z-10">

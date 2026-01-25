@@ -19,15 +19,12 @@ export const createUser = async (userData) => {
   try {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
-    
-    // Auto-generate username from email (part before @)
-    const username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
 
     const result = await client.query(`
-      INSERT INTO users (username, name, email, password_hash, role, is_active)
-      VALUES ($1, $2, $3, $4, $5, true)
-      RETURNING id, username, name, email, role, is_active, created_at
-    `, [username, name, email, passwordHash, role]);
+      INSERT INTO users (name, email, password_hash, role, is_active)
+      VALUES ($1, $2, $3, $4, true)
+      RETURNING id, name, email, role, is_active, created_at
+    `, [name, email, passwordHash, role]);
 
     return result.rows[0];
   } finally {
@@ -188,38 +185,27 @@ export const assignAnalysisToUser = async (userId, analysisId, assignedBy, notes
   try {
     await client.query('BEGIN');
     
-    // Check if user already has an analysis assigned
+    // Check if this specific assignment already exists
     const existingAssignment = await client.query(`
       SELECT id, analysis_id 
       FROM user_analysis_assignments 
-      WHERE user_id = $1
-    `, [userId]);
+      WHERE user_id = $1 AND analysis_id = $2
+    `, [userId, analysisId]);
     
-    // If user has an existing assignment (different analysis), remove it first
+    // If already assigned, just update the assignment
     if (existingAssignment.rows.length > 0) {
-      const existingAnalysisId = existingAssignment.rows[0].analysis_id;
-      
-      // If trying to assign the same analysis, just update it
-      if (existingAnalysisId === analysisId) {
-        const result = await client.query(`
-          UPDATE user_analysis_assignments
-          SET assigned_at = NOW(), notes = $3, assigned_by = $4
-          WHERE user_id = $1 AND analysis_id = $2
-          RETURNING *
-        `, [userId, analysisId, notes, assignedBy]);
-        
-        await client.query('COMMIT');
-        return result.rows[0];
-      }
-      
-      // Remove existing assignment (user can only have 1 analysis at a time)
-      await client.query(`
-        DELETE FROM user_analysis_assignments
+      const result = await client.query(`
+        UPDATE user_analysis_assignments
+        SET assigned_at = NOW(), notes = $3, assigned_by = $4
         WHERE user_id = $1 AND analysis_id = $2
-      `, [userId, existingAnalysisId]);
+        RETURNING *
+      `, [userId, analysisId, notes, assignedBy]);
+      
+      await client.query('COMMIT');
+      return result.rows[0];
     }
     
-    // Insert new assignment
+    // Insert new assignment (user can now have multiple analyses)
     const result = await client.query(`
       INSERT INTO user_analysis_assignments (user_id, analysis_id, assigned_by, notes)
       VALUES ($1, $2, $3, $4)
@@ -308,26 +294,34 @@ export const bulkAssignAnalysesToUser = async (userId, analysisIds, assignedBy) 
     await client.query('BEGIN');
     
     // Remove all existing assignments (user can only have 1 analysis)
-    await client.query(`
-      DELETE FROM user_analysis_assignments
-      WHERE user_id = $1
-    `, [userId]);
-    
-    // Assign only the first analysis (if provided)
-    if (analysisIds.length > 0) {
-      const analysisId = analysisIds[0]; // Only assign the first one
-      const result = await client.query(`
-        INSERT INTO user_analysis_assignments (user_id, analysis_id, assigned_by)
-        VALUES ($1, $2, $3)
-        RETURNING *
-      `, [userId, analysisId, assignedBy]);
-      
+    if (!analysisIds || analysisIds.length === 0) {
       await client.query('COMMIT');
-      return [result.rows[0]]; // Return array with single assignment
+      return [];
+    }
+    
+    const analysisIdArray = Array.isArray(analysisIds) ? analysisIds : [analysisIds];
+    const results = [];
+    
+    // Assign all provided analyses (skip duplicates)
+    for (const analysisId of analysisIdArray) {
+      // Check if already assigned
+      const existing = await client.query(`
+        SELECT id FROM user_analysis_assignments
+        WHERE user_id = $1 AND analysis_id = $2
+      `, [userId, analysisId]);
+      
+      if (existing.rows.length === 0) {
+        const result = await client.query(`
+          INSERT INTO user_analysis_assignments (user_id, analysis_id, assigned_by)
+          VALUES ($1, $2, $3)
+          RETURNING *
+        `, [userId, analysisId, assignedBy]);
+        results.push(result.rows[0]);
+      }
     }
     
     await client.query('COMMIT');
-    return []; // No assignments made
+    return results;
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
