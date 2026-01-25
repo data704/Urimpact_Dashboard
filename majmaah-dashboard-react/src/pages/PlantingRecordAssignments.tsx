@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Filter, Edit, Trash2, X, Loader2, CheckCircle, Percent, TrendingUp, Building2, Briefcase } from 'lucide-react';
+import { Plus, Search, Trash2, X, Loader2, CheckCircle, Percent, TrendingUp, Building2, Briefcase } from 'lucide-react';
 import apiService from '@/services/api';
 
 interface AssignmentStatistics {
@@ -77,7 +77,6 @@ const PlantingRecordAssignments: React.FC = () => {
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
-  const [creatingAnother, setCreatingAnother] = useState(false);
 
   useEffect(() => {
     fetchData();

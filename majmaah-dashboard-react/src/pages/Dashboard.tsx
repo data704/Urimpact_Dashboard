@@ -211,7 +211,6 @@ export const Dashboard: React.FC = () => {
       <DynamicReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
-        selectedAnalysisId={selectedAnalysisId}
       />
     </div>
   );

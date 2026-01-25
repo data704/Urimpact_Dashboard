@@ -1,10 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { Download, TreePine, Leaf, Globe } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import apiService from '@/services/api';
-import { config } from '@/config';
 import html2pdf from 'html2pdf.js';
 
 interface CertificateData {
@@ -48,7 +45,10 @@ const TreesCertificate: React.FC = () => {
           // Calculate totals by summing all assigned analyses
           // This gives us the true total across ALL areas assigned to the client
           const totalTrees = analyses.reduce((sum, analysis) => {
-            return sum + (parseInt(analysis.treeCount) || 0);
+            const treeCount = typeof analysis.treeCount === 'number' 
+              ? analysis.treeCount 
+              : parseInt(String(analysis.treeCount || 0), 10) || 0;
+            return sum + treeCount;
           }, 0);
           
           const totalCarbon = analyses.reduce((sum, analysis) => {
@@ -106,9 +106,13 @@ const TreesCertificate: React.FC = () => {
             const stats = statsResponse.data;
             
             // Extract totals from dashboard stats
-            const totalTrees = parseInt(stats.totalTrees) || 0;
+            const totalTrees = typeof stats.totalTrees === 'number' 
+              ? stats.totalTrees 
+              : parseInt(String(stats.totalTrees || 0), 10) || 0;
             // Parse the string value correctly (it's returned as .toFixed(2) string)
-            const totalCarbon = parseFloat(stats.carbonSequestered) || 0;
+            const totalCarbon = typeof stats.carbonSequestered === 'number'
+              ? stats.carbonSequestered
+              : parseFloat(String(stats.carbonSequestered || 0)) || 0;
             
             setCertificateData({
               totalTrees,
@@ -168,7 +172,7 @@ const TreesCertificate: React.FC = () => {
     const opt = {
       margin: 0,
       filename: `certificate-${certificateData.clientName.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: { 
         scale: 2,
         useCORS: true,

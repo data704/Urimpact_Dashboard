@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Search, ChevronDown, X } from 'lucide-react';
 import apiService from '@/services/api';
 
@@ -21,7 +20,6 @@ interface Certification {
 }
 
 const CertificationsHistory: React.FC = () => {
-  const { t } = useTranslation();
   const [certifications, setCertifications] = useState<Certification[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

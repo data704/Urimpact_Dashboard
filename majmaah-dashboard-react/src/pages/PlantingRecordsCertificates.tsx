@@ -36,7 +36,6 @@ const PlantingRecordsCertificates: React.FC = () => {
   const map = useRef<mapboxgl.Map | null>(null);
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [allTrees, setAllTrees] = useState<MajmaahTree[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
   const [mapStyle, setMapStyle] = useState<string>(MAP_STYLES.satellite);
   const [currentMapStyle, setCurrentMapStyle] = useState<string>(MAP_STYLES.satellite);
   const [searchTerm, setSearchTerm] = useState('');
@@ -187,12 +186,16 @@ const PlantingRecordsCertificates: React.FC = () => {
       }
 
       // Remove existing event listeners to avoid duplicates
-      map.current.off('click', 'clusters');
-      map.current.off('click', 'unclustered-point');
-      map.current.off('mouseenter', 'clusters');
-      map.current.off('mouseleave', 'clusters');
-      map.current.off('mouseenter', 'unclustered-point');
-      map.current.off('mouseleave', 'unclustered-point');
+      try {
+        map.current.off('click', 'clusters');
+        map.current.off('click', 'unclustered-point');
+        map.current.off('mouseenter', 'clusters');
+        map.current.off('mouseleave', 'clusters');
+        map.current.off('mouseenter', 'unclustered-point');
+        map.current.off('mouseleave', 'unclustered-point');
+      } catch (e) {
+        // Ignore if listeners don't exist
+      }
 
       // Add area polygons
       if (areasWithCoordinates.length > 0) {
@@ -329,7 +332,7 @@ const PlantingRecordsCertificates: React.FC = () => {
           (map.current!.getSource('trees-clusters') as mapboxgl.GeoJSONSource).getClusterExpansionZoom(
             clusterId,
             (err, zoom) => {
-              if (err) return;
+              if (err || zoom === undefined || zoom === null) return;
               map.current!.easeTo({
                 center: (features[0].geometry as any).coordinates,
                 zoom: zoom,
@@ -509,7 +512,7 @@ const PlantingRecordsCertificates: React.FC = () => {
       excelData.push({
         'S.No': '',
         'Planting Site Name': 'TOTAL',
-        'Trees Count': totalTrees,
+        'Trees Count': totalTrees.toString(),
         'Analysis Date': '',
       });
 
@@ -644,9 +647,9 @@ const PlantingRecordsCertificates: React.FC = () => {
 
       // Configure PDF options
       const opt = {
-        margin: [10, 10, 10, 10],
+        margin: 10 as number,
         filename: `Planting_Records_${new Date().toISOString().split('T')[0]}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { scale: 2 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
