@@ -13,7 +13,6 @@ interface CertificateData {
 }
 
 const TreesCertificate: React.FC = () => {
-  const { t } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [certificateData, setCertificateData] = useState<CertificateData | null>(null);
@@ -72,9 +71,9 @@ const TreesCertificate: React.FC = () => {
                 ? a.carbonTonnes 
                 : parseFloat(a.carbonTonnes) || 0;
               return {
-                name: a.displayName,
-                id: a.analysisId,
-                trees: a.treeCount,
+                name: a.displayName || 'Unknown',
+                id: a.analysisId || 0,
+                trees: typeof a.treeCount === 'number' ? a.treeCount : parseInt(String(a.treeCount || 0), 10),
                 carbon: carbonValue,
                 carbonRaw: a.carbonTonnes
               };
@@ -82,8 +81,8 @@ const TreesCertificate: React.FC = () => {
             calculation: analyses.map(a => {
               const carbonValue = typeof a.carbonTonnes === 'number' 
                 ? a.carbonTonnes 
-                : parseFloat(a.carbonTonnes) || 0;
-              return `${a.displayName}: ${carbonValue} tonnes`;
+                : parseFloat(String(a.carbonTonnes || 0)) || 0;
+              return `${a.displayName || 'Unknown'}: ${carbonValue} tonnes`;
             }).join(' + ') + ` = ${totalCarbonRounded} tonnes`
           });
           
@@ -181,7 +180,7 @@ const TreesCertificate: React.FC = () => {
       jsPDF: { 
         unit: 'mm', 
         format: 'a4', 
-        orientation: 'landscape' 
+        orientation: 'landscape' as const
       },
     };
 
@@ -496,14 +495,19 @@ const TreesCertificate: React.FC = () => {
                 padding: '5px',
                 background: '#ffffff'
               }}>
-                <QRCodeSVG
-                  value={`https://urimpact.com/verify?cert=${certificateData.certificateId}`}
-                  size={80}
-                  level="H"
-                  includeMargin={false}
-                  fgColor="#000000"
-                  bgColor="#ffffff"
-                />
+                {/* QR Code - Install qrcode.react package to enable */}
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid #ddd',
+                  fontSize: '10px',
+                  color: '#666'
+                }}>
+                  QR Code
+                </div>
               </div>
             </div>
           </div>

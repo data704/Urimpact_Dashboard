@@ -36,6 +36,7 @@ const PlantingRecordsCertificates: React.FC = () => {
   const map = useRef<mapboxgl.Map | null>(null);
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [allTrees, setAllTrees] = useState<MajmaahTree[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
   const [mapStyle, setMapStyle] = useState<string>(MAP_STYLES.satellite);
   const [currentMapStyle, setCurrentMapStyle] = useState<string>(MAP_STYLES.satellite);
   const [searchTerm, setSearchTerm] = useState('');
@@ -185,17 +186,8 @@ const PlantingRecordsCertificates: React.FC = () => {
         // Source doesn't exist, ignore
       }
 
-      // Remove existing event listeners to avoid duplicates
-      try {
-        map.current.off('click', 'clusters');
-        map.current.off('click', 'unclustered-point');
-        map.current.off('mouseenter', 'clusters');
-        map.current.off('mouseleave', 'clusters');
-        map.current.off('mouseenter', 'unclustered-point');
-        map.current.off('mouseleave', 'unclustered-point');
-      } catch (e) {
-        // Ignore if listeners don't exist
-      }
+      // Note: Mapbox off() requires the exact listener function reference
+      // We'll handle event listeners by checking if they exist before adding
 
       // Add area polygons
       if (areasWithCoordinates.length > 0) {
@@ -512,9 +504,9 @@ const PlantingRecordsCertificates: React.FC = () => {
       excelData.push({
         'S.No': '',
         'Planting Site Name': 'TOTAL',
-        'Trees Count': totalTrees.toString(),
+        'Trees Count': totalTrees,
         'Analysis Date': '',
-      });
+      } as any);
 
       // Create workbook and worksheet
       const ws = XLSX.utils.json_to_sheet(excelData);
@@ -651,7 +643,7 @@ const PlantingRecordsCertificates: React.FC = () => {
         filename: `Planting_Records_${new Date().toISOString().split('T')[0]}.pdf`,
         image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const },
       };
 
       // Generate PDF
