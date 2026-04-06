@@ -163,8 +163,12 @@ async function startServer() {
     // 3. Initialize database schema
     await initializeDatabase();
 
-    // 4. Initialize Google Earth Engine
-    await initEarthEngine();
+    // 4. Initialize Google Earth Engine (non-fatal — server starts even if GEE is unavailable)
+    try {
+      await initEarthEngine();
+    } catch (geeError) {
+      console.warn('⚠️  Google Earth Engine initialization failed (NDVI features will be unavailable):', geeError.message);
+    }
 
     // 5. Start server
     const server = app.listen(PORT, () => {

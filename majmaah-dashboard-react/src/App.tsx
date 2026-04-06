@@ -7,6 +7,7 @@ import { Login } from '@/pages/auth/Login';
 import { Dashboard } from '@/pages/Dashboard';
 import PlantingRecordsCertificates from '@/pages/PlantingRecordsCertificates';
 import TreesCertificate from '@/pages/TreesCertificate';
+import BasicCertificate from '@/pages/BasicCertificate';
 import Departments from '@/pages/Departments';
 import Employees from '@/pages/Employees';
 import PlantingRecordAssignments from '@/pages/PlantingRecordAssignments';
@@ -61,7 +62,7 @@ const AppRoutes: React.FC = () => {
         <Route path="certifications-history" element={<CertificationsHistory />} />
         {/* Company Certificate */}
         <Route path="trees-certificate" element={<TreesCertificate />} />
-        <Route path="basic-certificate" element={<PlaceholderPage title="Basic Certificate" />} />
+        <Route path="basic-certificate" element={<BasicCertificate />} />
         {/* Profile */}
         <Route path="my-profile" element={<PlaceholderPage title="My Profile" />} />
       </Route>

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Trash2, X, Loader2, CheckCircle, Percent, TrendingUp, Building2, Briefcase } from 'lucide-react';
+import { Plus, Search, Trash2, X, Loader2, CheckCircle, Percent, TrendingUp, Building2, Briefcase, Download, TreePine, Leaf, Globe } from 'lucide-react';
 import apiService from '@/services/api';
+import html2pdf from 'html2pdf.js';
 
 interface AssignmentStatistics {
   totalTreesPlanted: number;
@@ -51,6 +52,16 @@ interface Employee {
   departmentId?: number;
 }
 
+interface AssignmentCertificatePreview {
+  recipientName: string;
+  partyType: 'department' | 'employee';
+  treesAssigned: number;
+  carbonTonnes: number;
+  plantingRecordName: string;
+  certificationId: string;
+  dateLabel: string;
+}
+
 const PlantingRecordAssignments: React.FC = () => {
   const { t } = useTranslation();
   const [statistics, setStatistics] = useState<AssignmentStatistics>({
@@ -77,7 +88,8 @@ const PlantingRecordAssignments: React.FC = () => {
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
-  const [_creatingAnother, setCreatingAnother] = useState(false);
+  const [certificatePreview, setCertificatePreview] = useState<AssignmentCertificatePreview | null>(null);
+  const certificateRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchData();
@@ -131,7 +143,6 @@ const PlantingRecordAssignments: React.FC = () => {
       notes: '',
     });
     setIsModalOpen(true);
-    setCreatingAnother(false);
   };
 
   const handleCloseModal = () => {
@@ -145,69 +156,128 @@ const PlantingRecordAssignments: React.FC = () => {
       plantingType: '',
       notes: '',
     });
-    setCreatingAnother(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent, createAnother: boolean = false) => {
-    e.preventDefault();
-
+  const validateAssignmentForm = (): boolean => {
     if (!formData.analysisId) {
       alert('Planting Record is required');
-      return;
+      return false;
     }
-
-    if (!formData.treesAssigned || parseInt(formData.treesAssigned) <= 0) {
+    if (!formData.treesAssigned || parseInt(formData.treesAssigned, 10) <= 0) {
       alert('Number of trees must be greater than 0');
-      return;
+      return false;
     }
-
     if (formData.assignToType === 'department' && !formData.departmentId) {
       alert('Department is required');
-      return;
+      return false;
     }
-
     if (formData.assignToType === 'employee' && !formData.employeeId) {
       alert('Employee is required');
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateAssignmentForm()) return;
 
     try {
       setSubmitting(true);
-      setCreatingAnother(createAnother);
-
       await apiService.createPlantingRecordAssignment({
-        analysisId: parseInt(formData.analysisId),
+        analysisId: parseInt(formData.analysisId, 10),
         assignToType: formData.assignToType,
-        departmentId: formData.departmentId ? parseInt(formData.departmentId) : undefined,
-        employeeId: formData.employeeId ? parseInt(formData.employeeId) : undefined,
-        treesAssigned: parseInt(formData.treesAssigned),
+        departmentId: formData.departmentId ? parseInt(formData.departmentId, 10) : undefined,
+        employeeId: formData.employeeId ? parseInt(formData.employeeId, 10) : undefined,
+        treesAssigned: parseInt(formData.treesAssigned, 10),
         plantingType: formData.plantingType || undefined,
         notes: formData.notes || undefined,
       });
-
       await fetchData();
-
-      if (createAnother) {
-        // Reset form but keep modal open
-        setFormData({
-          analysisId: '',
-          treesAssigned: '',
-          assignToType: 'department',
-          departmentId: '',
-          employeeId: '',
-          plantingType: '',
-          notes: '',
-        });
-      } else {
-        handleCloseModal();
-      }
+      handleCloseModal();
     } catch (error: any) {
       console.error('Error creating assignment:', error);
       alert(error.response?.data?.error || 'Failed to create assignment');
     } finally {
       setSubmitting(false);
-      setCreatingAnother(false);
     }
+  };
+
+  const handleCreateCertificate = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!validateAssignmentForm()) return;
+
+    try {
+      setSubmitting(true);
+      const response = await apiService.createPlantingRecordAssignment({
+        analysisId: parseInt(formData.analysisId, 10),
+        assignToType: formData.assignToType,
+        departmentId: formData.departmentId ? parseInt(formData.departmentId, 10) : undefined,
+        employeeId: formData.employeeId ? parseInt(formData.employeeId, 10) : undefined,
+        treesAssigned: parseInt(formData.treesAssigned, 10),
+        plantingType: formData.plantingType || undefined,
+        notes: formData.notes || undefined,
+      });
+
+      await fetchData();
+      handleCloseModal();
+
+      if (response.success && response.data) {
+        const d = response.data;
+        const recipientName =
+          d.assignToType === 'department'
+            ? d.departmentName || 'Department'
+            : d.employeeName || 'Employee';
+        const carbon = Math.round((d.assignedCarbonEmission || 0) * 100) / 100;
+        const certId =
+          d.certificationId ||
+          `PRT-${d.id}-${new Date().toISOString().slice(0, 10)}`;
+
+        setCertificatePreview({
+          recipientName,
+          partyType: d.assignToType,
+          treesAssigned: d.treesAssigned,
+          carbonTonnes: carbon,
+          plantingRecordName: d.plantingRecordName || 'Planting record',
+          certificationId: certId,
+          dateLabel: new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          }),
+        });
+      }
+    } catch (error: any) {
+      console.error('Error creating assignment with certificate:', error);
+      alert(error.response?.data?.error || 'Failed to create assignment');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCloseCertificateModal = () => {
+    setCertificatePreview(null);
+  };
+
+  const handleDownloadAssignmentCertificatePdf = () => {
+    if (!certificateRef.current || !certificatePreview) return;
+    const safeName = certificatePreview.recipientName.toLowerCase().replace(/\s+/g, '-');
+    const opt = {
+      margin: 0,
+      filename: `planting-assignment-certificate-${safeName}-${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'landscape' as const,
+      },
+    };
+    html2pdf().set(opt).from(certificateRef.current).save();
   };
 
   const handleDelete = async (id: number) => {
@@ -464,7 +534,7 @@ const PlantingRecordAssignments: React.FC = () => {
             </div>
 
             {/* Form */}
-            <form onSubmit={(e) => handleSubmit(e, false)} className="p-6">
+            <form onSubmit={handleSubmit} className="p-6">
               {/* Planting Record */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -633,11 +703,11 @@ const PlantingRecordAssignments: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => handleSubmit(e, true)}
+                  onClick={handleCreateCertificate}
                   disabled={submitting}
-                  className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-white text-[#13c5bc] border-2 border-[#13c5bc] rounded-lg hover:bg-teal-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                 >
-                  Create & create another
+                  Create certificate
                 </button>
                 <button
                   type="button"
@@ -648,6 +718,282 @@ const PlantingRecordAssignments: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assignment certificate (after Create certificate) */}
+      {certificatePreview && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl my-8 max-h-[95vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white z-10">
+              <h2 className="text-lg font-semibold text-gray-900">Planting assignment certificate</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadAssignmentCertificatePdf}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#13c5bc] text-white rounded-lg hover:bg-[#0ea5a0] text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Download PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseCertificateModal}
+                  className="p-2 text-gray-400 hover:text-gray-600"
+                  aria-label="Close"
+                >
+                  <X size={22} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50">
+              <div
+                ref={certificateRef}
+                className="assignment-certificate-print"
+                style={{
+                  width: '297mm',
+                  minHeight: '210mm',
+                  margin: '0 auto',
+                  background: '#ffffff',
+                  padding: 0,
+                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+                }}
+              >
+                <div
+                  style={{
+                    background: 'linear-gradient(to right, #13c5bc, #059669)',
+                    padding: '50px 80px',
+                    textAlign: 'center',
+                    width: '100%',
+                  }}
+                >
+                  <h1
+                    style={{
+                      fontSize: '32pt',
+                      fontWeight: 'bold',
+                      margin: '0 0 12px 0',
+                      color: '#ffffff',
+                      lineHeight: '1.2',
+                      textTransform: 'uppercase',
+                      letterSpacing: '2px',
+                      fontFamily: 'Arial, Helvetica, sans-serif',
+                    }}
+                  >
+                    CERTIFICATE OF TREE ASSIGNMENT
+                  </h1>
+                  <p
+                    style={{
+                      fontSize: '16pt',
+                      margin: 0,
+                      color: '#ffffff',
+                      fontFamily: 'Arial, Helvetica, sans-serif',
+                    }}
+                  >
+                    Issued to {certificatePreview.partyType === 'department' ? 'Department' : 'Employee'}
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    padding: '48px 72px',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                    <p
+                      style={{
+                        fontSize: '15pt',
+                        lineHeight: 1.75,
+                        color: '#000000',
+                        margin: '0 auto',
+                        maxWidth: '90%',
+                        fontFamily: 'Arial, Helvetica, sans-serif',
+                      }}
+                    >
+                      This certificate is issued to{' '}
+                      <strong style={{ color: '#13c5bc' }}>{certificatePreview.recipientName}</strong> for the assignment
+                      of trees under the planting record{' '}
+                      <strong>{certificatePreview.plantingRecordName}</strong>, in support of the Saudi Green Initiative
+                      and environmental sustainability.
+                    </p>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1px 1fr 1px 1fr',
+                      gap: 0,
+                      marginTop: '28px',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div style={{ textAlign: 'center', padding: '16px' }}>
+                      <TreePine
+                        size={56}
+                        strokeWidth={1.5}
+                        style={{ margin: '0 auto 16px', color: '#000000' }}
+                      />
+                      <div
+                        style={{
+                          fontSize: '48pt',
+                          fontWeight: 'bold',
+                          lineHeight: 1,
+                          marginBottom: '12px',
+                          color: '#13c5bc',
+                          fontFamily: 'Arial, Helvetica, sans-serif',
+                        }}
+                      >
+                        {certificatePreview.treesAssigned.toLocaleString()}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '13pt',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1px',
+                          color: '#000000',
+                          fontFamily: 'Arial, Helvetica, sans-serif',
+                        }}
+                      >
+                        Trees assigned
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        width: '1px',
+                        height: '100%',
+                        background: '#13c5bc',
+                        margin: '0 16px',
+                      }}
+                    />
+                    <div style={{ textAlign: 'center', padding: '16px' }}>
+                      <Leaf size={56} strokeWidth={1.5} style={{ margin: '0 auto 16px', color: '#000000' }} />
+                      <div
+                        style={{
+                          fontSize: '22pt',
+                          fontWeight: 'normal',
+                          lineHeight: 1.35,
+                          color: '#13c5bc',
+                          fontFamily: 'Arial, Helvetica, sans-serif',
+                          marginTop: '8px',
+                        }}
+                      >
+                        {certificatePreview.recipientName}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '13pt',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1px',
+                          color: '#000000',
+                          marginTop: '14px',
+                          fontFamily: 'Arial, Helvetica, sans-serif',
+                        }}
+                      >
+                        {certificatePreview.partyType === 'department' ? 'Department' : 'Employee'}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        width: '1px',
+                        height: '100%',
+                        background: '#13c5bc',
+                        margin: '0 16px',
+                      }}
+                    />
+                    <div style={{ textAlign: 'center', padding: '16px' }}>
+                      <Globe size={56} strokeWidth={1.5} style={{ margin: '0 auto 16px', color: '#000000' }} />
+                      <div
+                        style={{
+                          fontSize: '48pt',
+                          fontWeight: 'bold',
+                          lineHeight: 1,
+                          marginBottom: '12px',
+                          color: '#13c5bc',
+                          fontFamily: 'Arial, Helvetica, sans-serif',
+                        }}
+                      >
+                        {certificatePreview.carbonTonnes.toLocaleString()}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '13pt',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1px',
+                          color: '#000000',
+                          fontFamily: 'Arial, Helvetica, sans-serif',
+                        }}
+                      >
+                        Tons CO₂ (assigned share)
+                      </div>
+                    </div>
+                  </div>
+
+                  <p
+                    style={{
+                      textAlign: 'center',
+                      marginTop: '36px',
+                      fontSize: '12pt',
+                      color: '#374151',
+                      fontFamily: 'Arial, Helvetica, sans-serif',
+                    }}
+                  >
+                    Date of issue: {certificatePreview.dateLabel}
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    padding: '24px 72px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-end',
+                    borderTop: '1px solid #e5e7eb',
+                  }}
+                >
+                  <div>
+                    <p style={{ fontSize: '10pt', margin: '2px 0', color: '#000000', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                      Certificate ID: {certificatePreview.certificationId}
+                    </p>
+                    <p style={{ fontSize: '10pt', margin: '2px 0', color: '#000000', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                      Verify at urimpact.com/verify
+                    </p>
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                    <img
+                      src="/assets/img/URIMPACT_LOGO.png"
+                      alt=""
+                      style={{ height: '36px', width: 'auto', objectFit: 'contain' }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      width: '72px',
+                      height: '72px',
+                      border: '1px solid #ddd',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '9px',
+                      color: '#666',
+                    }}
+                  >
+                    QR Code
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

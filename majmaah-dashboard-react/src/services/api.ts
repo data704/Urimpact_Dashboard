@@ -503,6 +503,7 @@ class ApiService {
         assignedCarbonEmission: number;
         notes?: string;
         createdAt: string;
+        certificationId?: string | null;
       };
     }>('/planting-record-assignments', data);
   }

@@ -1,5 +1,58 @@
 // Certification History Service - Handle certification database operations
+import crypto from 'crypto';
 import pool from '../config/database.js';
+
+/**
+ * Insert a certification row for a planting record assignment (same DB client as assignment for consistency).
+ * Uses a collision-resistant certification_id and only sets issued_by if the user exists (avoids FK errors).
+ */
+export const insertCertificationForPlantingAssignment = async (client, {
+  assignToType,
+  departmentId,
+  employeeId,
+  awardedToName,
+  treesAssigned,
+  carbonSequestered,
+  assignedBy,
+}) => {
+  let issuedBy = assignedBy != null ? Number(assignedBy) : null;
+  if (issuedBy != null && Number.isNaN(issuedBy)) {
+    issuedBy = null;
+  }
+  if (issuedBy != null) {
+    const ur = await client.query('SELECT id FROM users WHERE id = $1', [issuedBy]);
+    if (ur.rows.length === 0) {
+      issuedBy = null;
+    }
+  }
+
+  const day = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const certificationId = `CERT-${day}-${crypto.randomBytes(6).toString('hex')}`;
+
+  await client.query(
+    `
+    INSERT INTO certifications_history (
+      certification_id, certificate_type, receiving_party_type,
+      department_id, employee_id, awarded_to_name,
+      trees_count, carbon_sequestered, issued_by,
+      date_awarded, created_at, updated_at
+    )
+    VALUES ($1, 'planting_assignment', $2, $3, $4, $5, $6, $7, $8, NOW(), NOW(), NOW())
+  `,
+    [
+      certificationId,
+      assignToType,
+      assignToType === 'department' ? departmentId : null,
+      assignToType === 'employee' ? employeeId : null,
+      awardedToName,
+      treesAssigned,
+      carbonSequestered,
+      issuedBy,
+    ]
+  );
+
+  return certificationId;
+};
 
 /**
  * Get all certifications

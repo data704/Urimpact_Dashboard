@@ -1,5 +1,6 @@
 // Planting Record Assignment Service - Handle assignment database operations
 import pool from '../config/database.js';
+import { insertCertificationForPlantingAssignment } from './certificationHistoryService.js';
 
 /**
  * Get all planting record assignments
@@ -252,7 +253,8 @@ export const createAssignment = async ({
 
     const assignment = await getAssignmentById(result.rows[0].id);
 
-    // Automatically create a certification record when assignment is created
+    let certificationIdStored = null;
+    // Record in certifications_history so it appears on Certifications History page
     try {
       let awardedToName = '';
       if (assignToType === 'department') {
@@ -263,7 +265,6 @@ export const createAssignment = async ({
         awardedToName = empResult.rows[0]?.name || 'Unknown Employee';
       }
 
-      // Get analysis data to calculate carbon
       const analysisDataResult = await client.query(
         'SELECT co2_equivalent_tonnes, tree_count FROM analysis_results WHERE id = $1',
         [analysisId]
@@ -272,43 +273,27 @@ export const createAssignment = async ({
       let assignedCarbon = 0;
       if (analysisDataResult.rows[0]) {
         const totalCarbon = parseFloat(analysisDataResult.rows[0].co2_equivalent_tonnes) || 0;
-        const analysisTreeCount = parseInt(analysisDataResult.rows[0].tree_count) || 1;
+        const analysisTreeCount = parseInt(analysisDataResult.rows[0].tree_count, 10) || 1;
         if (analysisTreeCount > 0) {
           const carbonPerTree = totalCarbon / analysisTreeCount;
           assignedCarbon = carbonPerTree * treesAssigned;
         }
       }
 
-      // Generate certification ID
-      const certIdResult = await client.query(`
-        SELECT 'CERT-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || LPAD((COALESCE((SELECT MAX(id) FROM certifications_history), 0) + 1)::TEXT, 6, '0') as cert_id
-      `);
-      const certificationId = certIdResult.rows[0].cert_id;
-
-      await client.query(`
-        INSERT INTO certifications_history (
-          certification_id, certificate_type, receiving_party_type,
-          department_id, employee_id, awarded_to_name,
-          trees_count, carbon_sequestered, issued_by,
-          date_awarded, created_at, updated_at
-        )
-        VALUES ($1, 'trees', $2, $3, $4, $5, $6, $7, $8, NOW(), NOW(), NOW())
-      `, [
-        certificationId,
+      certificationIdStored = await insertCertificationForPlantingAssignment(client, {
         assignToType,
-        assignToType === 'department' ? departmentId : null,
-        assignToType === 'employee' ? employeeId : null,
+        departmentId,
+        employeeId,
         awardedToName,
         treesAssigned,
-        assignedCarbon,
-        assignedBy || null,
-      ]);
+        carbonSequestered: Math.round(assignedCarbon * 100) / 100,
+        assignedBy,
+      });
     } catch (certError) {
-      // Log but don't fail the assignment if certification creation fails
-      console.error('Error creating certification record:', certError);
+      console.error('Error creating certification record for assignment:', certError?.message || certError, certError?.detail);
     }
 
-    return assignment;
+    return { ...assignment, certificationId: certificationIdStored };
   } finally {
     client.release();
   }

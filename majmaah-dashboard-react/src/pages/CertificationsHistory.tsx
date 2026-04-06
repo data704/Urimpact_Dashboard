@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Search, ChevronDown, X } from 'lucide-react';
 import apiService from '@/services/api';
 
@@ -19,20 +20,23 @@ interface Certification {
   createdAt: string;
 }
 
+function certificateTypeLabel(type: string): string {
+  if (type === 'planting_assignment') return 'Planting assignment';
+  if (type === 'trees') return 'Trees';
+  return type || '—';
+}
+
 const CertificationsHistory: React.FC = () => {
+  const location = useLocation();
   const [certifications, setCertifications] = useState<Certification[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchCertifications();
-  }, []);
-
-  const fetchCertifications = async () => {
+  const fetchCertifications = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiService.getCertificationsHistory();
-      if (response.success) {
+      if (response.success && Array.isArray(response.data)) {
         setCertifications(response.data);
       }
     } catch (error) {
@@ -40,13 +44,20 @@ const CertificationsHistory: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Refetch whenever user opens this page (e.g. after creating an assignment certificate)
+  useEffect(() => {
+    fetchCertifications();
+  }, [location.pathname, fetchCertifications]);
 
   const filteredCertifications = certifications.filter((cert) => {
     const searchLower = searchTerm.toLowerCase();
+    const typeLabel = certificateTypeLabel(cert.certificateType).toLowerCase();
     return (
       cert.certificationId.toLowerCase().includes(searchLower) ||
       cert.awardedToName.toLowerCase().includes(searchLower) ||
+      typeLabel.includes(searchLower) ||
       (cert.departmentName && cert.departmentName.toLowerCase().includes(searchLower)) ||
       (cert.employeeName && cert.employeeName.toLowerCase().includes(searchLower))
     );
@@ -99,6 +110,9 @@ const CertificationsHistory: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Certification ID
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">
                     Date Awarded
                     <ChevronDown className="inline ml-1 w-4 h-4" />
@@ -109,12 +123,18 @@ const CertificationsHistory: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Awarded To
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Trees
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    CO₂ (t)
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredCertifications.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center">
+                    <td colSpan={7} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                           <X className="text-gray-400" size={32} />
@@ -130,6 +150,9 @@ const CertificationsHistory: React.FC = () => {
                         {cert.certificationId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {certificateTypeLabel(cert.certificateType)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         {formatDate(cert.dateAwarded)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -137,6 +160,14 @@ const CertificationsHistory: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {cert.awardedToName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {cert.treesCount?.toLocaleString?.() ?? cert.treesCount}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {typeof cert.carbonSequestered === 'number'
+                          ? cert.carbonSequestered.toFixed(2)
+                          : Number(cert.carbonSequestered || 0).toFixed(2)}
                       </td>
                     </tr>
                   ))
